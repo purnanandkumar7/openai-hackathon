@@ -1,0 +1,109 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: atlas-ai-config
+  namespace: atlas-ai
+  labels:
+    app.kubernetes.io/name: atlas-ai
+    app.kubernetes.io/component: config
+    app.kubernetes.io/part-of: atlas-ai-platform
+data:
+  # ── Application Settings ───────────────────────────────────────────────────
+  APP_NAME: "Atlas AI"
+  APP_ENV: "production"
+  APP_VERSION: "1.0.0"
+  LOG_LEVEL: "INFO"
+  LOG_FORMAT: "json"
+
+  # ── API Endpoints ──────────────────────────────────────────────────────────
+  BACKEND_HOST: "0.0.0.0"
+  BACKEND_PORT: "8000"
+  FRONTEND_URL: "https://atlas-ai.company.com"
+  API_BASE_URL: "https://atlas-ai.company.com/api/v1"
+  CORS_ORIGINS: "https://atlas-ai.company.com,https://atlas-ai-staging.company.com"
+
+  # ── Database Configuration (non-secret) ───────────────────────────────────
+  POSTGRES_HOST: "postgres-service.atlas-ai.svc.cluster.local"
+  POSTGRES_PORT: "5432"
+  POSTGRES_DB: "atlas_ai"
+  POSTGRES_POOL_SIZE: "20"
+  POSTGRES_MAX_OVERFLOW: "10"
+  POSTGRES_POOL_TIMEOUT: "30"
+  POSTGRES_POOL_RECYCLE: "3600"
+
+  # ── Redis Configuration (non-secret) ──────────────────────────────────────
+  REDIS_HOST: "redis-service.atlas-ai.svc.cluster.local"
+  REDIS_PORT: "6379"
+  REDIS_DB: "0"
+  REDIS_MAX_CONNECTIONS: "50"
+  REDIS_SOCKET_TIMEOUT: "5"
+  REDIS_CONNECT_TIMEOUT: "5"
+
+  # ── OpenAI / LLM Settings ─────────────────────────────────────────────────
+  OPENAI_MODEL: "gpt-4o"
+  OPENAI_FALLBACK_MODEL: "gpt-4o-mini"
+  OPENAI_MAX_TOKENS: "4096"
+  OPENAI_TEMPERATURE: "0.2"
+  OPENAI_REQUEST_TIMEOUT: "120"
+  OPENAI_MAX_RETRIES: "3"
+  EMBEDDING_MODEL: "text-embedding-3-large"
+  EMBEDDING_DIMENSIONS: "3072"
+
+  # ── Agent Configuration ────────────────────────────────────────────────────
+  AGENT_MAX_ITERATIONS: "25"
+  AGENT_TIMEOUT_SECONDS: "300"
+  ORCHESTRATOR_TIMEOUT_SECONDS: "600"
+  TRIAGE_AGENT_TIMEOUT_SECONDS: "120"
+  DIAGNOSIS_AGENT_TIMEOUT_SECONDS: "240"
+  REMEDIATION_AGENT_TIMEOUT_SECONDS: "300"
+  POSTMORTEM_AGENT_TIMEOUT_SECONDS: "180"
+  PLANNING_AGENT_TIMEOUT_SECONDS: "120"
+  AGENT_MEMORY_WINDOW: "50"
+  AGENT_PARALLEL_LIMIT: "5"
+  MAX_CONCURRENT_INVESTIGATIONS: "10"
+
+  # ── Feature Flags ─────────────────────────────────────────────────────────
+  FEATURE_AUTO_REMEDIATION: "false"
+  FEATURE_AUTO_ROLLBACK: "false"
+  FEATURE_POSTMORTEM_GENERATION: "true"
+  FEATURE_SLACK_NOTIFICATIONS: "true"
+  FEATURE_JIRA_INTEGRATION: "true"
+  FEATURE_GITHUB_INTEGRATION: "true"
+  FEATURE_PAGERDUTY_INTEGRATION: "false"
+  FEATURE_COST_TRACKING: "true"
+  FEATURE_AUDIT_LOG: "true"
+  FEATURE_MULTI_TENANCY: "false"
+  FEATURE_VECTOR_SEARCH: "true"
+
+  # ── MCP Tool Server Endpoints ──────────────────────────────────────────────
+  MCP_KUBERNETES_ENDPOINT: "http://mcp-k8s-server:8080"
+  MCP_GITHUB_ENDPOINT: "http://mcp-github-server:8081"
+  MCP_SLACK_ENDPOINT: "http://mcp-slack-server:8082"
+  MCP_JIRA_ENDPOINT: "http://mcp-jira-server:8083"
+  MCP_PROMETHEUS_ENDPOINT: "http://prometheus-operated.monitoring.svc.cluster.local:9090"
+  MCP_GRAFANA_ENDPOINT: "http://grafana.monitoring.svc.cluster.local:3000"
+
+  # ── Monitoring & Observability ─────────────────────────────────────────────
+  METRICS_ENABLED: "true"
+  METRICS_PORT: "9090"
+  METRICS_PATH: "/metrics"
+  TRACING_ENABLED: "true"
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector.monitoring.svc.cluster.local:4317"
+  OTEL_SERVICE_NAME: "atlas-ai-backend"
+
+  # ── Rate Limiting ──────────────────────────────────────────────────────────
+  RATE_LIMIT_ENABLED: "true"
+  RATE_LIMIT_REQUESTS_PER_MINUTE: "120"
+  RATE_LIMIT_BURST: "20"
+
+  # ── Security ──────────────────────────────────────────────────────────────
+  JWT_ALGORITHM: "HS256"
+  JWT_ACCESS_TOKEN_EXPIRE_MINUTES: "60"
+  JWT_REFRESH_TOKEN_EXPIRE_DAYS: "30"
+
+  # ── Investigation Settings ─────────────────────────────────────────────────
+  INCIDENT_RETENTION_DAYS: "90"
+  RUNBOOK_CACHE_TTL_SECONDS: "3600"
+  KNOWLEDGE_BASE_REFRESH_INTERVAL: "86400"
+  SIMILARITY_THRESHOLD: "0.75"
+  MAX_SIMILAR_INCIDENTS: "5"

@@ -1,0 +1,154 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: atlas-ai-frontend
+  namespace: atlas-ai
+  labels:
+    app.kubernetes.io/name: atlas-ai-frontend
+    app.kubernetes.io/component: frontend
+    app.kubernetes.io/part-of: atlas-ai-platform
+    app.kubernetes.io/version: "1.0.0"
+spec:
+  replicas: 2
+  revisionHistoryLimit: 5
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: atlas-ai-frontend
+      app.kubernetes.io/component: frontend
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: atlas-ai-frontend
+        app.kubernetes.io/component: frontend
+        app.kubernetes.io/part-of: atlas-ai-platform
+        app.kubernetes.io/version: "1.0.0"
+    spec:
+      serviceAccountName: atlas-ai-sa
+      securityContext:
+        runAsUser: 1001
+        runAsGroup: 1001
+        fsGroup: 1001
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      terminationGracePeriodSeconds: 30
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: atlas-ai-frontend
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/name: atlas-ai-frontend
+                topologyKey: kubernetes.io/hostname
+      containers:
+        - name: frontend
+          image: ghcr.io/company/atlas-ai-frontend:1.0.0
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+          env:
+            # Next.js public runtime variables (baked at build or runtime)
+            - name: NEXT_PUBLIC_API_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: atlas-ai-config
+                  key: API_BASE_URL
+            - name: NEXT_PUBLIC_APP_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: atlas-ai-config
+                  key: APP_NAME
+            - name: NEXT_PUBLIC_APP_VERSION
+              valueFrom:
+                configMapKeyRef:
+                  name: atlas-ai-config
+                  key: APP_VERSION
+            - name: NEXT_PUBLIC_WS_URL
+              value: "wss://atlas-ai.company.com/api/v1/ws"
+            - name: NEXT_PUBLIC_ENVIRONMENT
+              valueFrom:
+                configMapKeyRef:
+                  name: atlas-ai-config
+                  key: APP_ENV
+            # Server-side Next.js vars (not exposed to browser)
+            - name: BACKEND_URL
+              value: "http://atlas-ai-backend-service.atlas-ai.svc.cluster.local:80"
+            - name: NEXTAUTH_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: atlas-ai-config
+                  key: FRONTEND_URL
+            - name: NEXTAUTH_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: atlas-ai-secrets
+                  key: JWT_SECRET_KEY
+            - name: NODE_ENV
+              value: "production"
+            - name: PORT
+              value: "3000"
+
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "256Mi"
+            limits:
+              cpu: "1000m"
+              memory: "1Gi"
+
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+              scheme: HTTP
+            initialDelaySeconds: 20
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+              scheme: HTTP
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: nextjs-cache
+              mountPath: /app/.next/cache
+
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: nextjs-cache
+          emptyDir: {}
+
+      imagePullSecrets:
+        - name: ghcr-registry-secret

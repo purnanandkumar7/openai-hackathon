@@ -1,0 +1,336 @@
+version: "3.9"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Atlas AI — Local Development Docker Compose
+#
+# Usage:
+#   cp .env.example .env   # fill in real API keys
+#   make dev               # starts all services
+#
+# Services:
+#   postgres    → localhost:5432
+#   redis       → localhost:6379
+#   backend     → http://localhost:8000   (API docs: /docs)
+#   frontend    → http://localhost:3000
+#   prometheus  → http://localhost:9090
+#   grafana     → http://localhost:3001   (admin/admin)
+# ─────────────────────────────────────────────────────────────────────────────
+
+x-common-env: &common-env
+  TZ: UTC
+  PYTHONUNBUFFERED: "1"
+
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+networks:
+  atlas-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/24
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+  backend_logs:
+    driver: local
+
+services:
+
+  # ── PostgreSQL 16 ───────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16.3-alpine
+    container_name: atlas-ai-postgres
+    restart: unless-stopped
+    networks:
+      - atlas-net
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: atlas_ai
+      POSTGRES_USER: atlas_ai
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      PGDATA: /var/lib/postgresql/data/pgdata
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=en_US.UTF-8"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/db/init.sql:/docker-entrypoint-initdb.d/01_init.sql:ro
+      - ./scripts/db/seed.sql:/docker-entrypoint-initdb.d/02_seed.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U atlas_ai -d atlas_ai"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+
+  # ── Redis 7 ─────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7.2-alpine
+    container_name: atlas-ai-redis
+    restart: unless-stopped
+    networks:
+      - atlas-net
+    ports:
+      - "6379:6379"
+    command: >
+      redis-server
+      --requirepass ${REDIS_PASSWORD}
+      --appendonly yes
+      --appendfsync everysec
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+      --loglevel notice
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+
+  # ── Atlas AI Backend (FastAPI) ──────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: development
+      args:
+        PYTHON_VERSION: "3.12"
+    container_name: atlas-ai-backend
+    restart: unless-stopped
+    networks:
+      - atlas-net
+    ports:
+      - "8000:8000"
+      - "9090:9090"   # Prometheus metrics
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      <<: *common-env
+      APP_ENV: development
+      LOG_LEVEL: DEBUG
+      LOG_FORMAT: json
+      BACKEND_HOST: 0.0.0.0
+      BACKEND_PORT: "8000"
+
+      # Database
+      DATABASE_URL: postgresql://atlas_ai:${POSTGRES_PASSWORD}@postgres:5432/atlas_ai
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: atlas_ai
+      POSTGRES_USER: atlas_ai
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_POOL_SIZE: "5"
+      POSTGRES_MAX_OVERFLOW: "5"
+
+      # Redis
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+
+      # LLM
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o}
+      OPENAI_FALLBACK_MODEL: gpt-4o-mini
+      OPENAI_MAX_TOKENS: "4096"
+      OPENAI_TEMPERATURE: "0.2"
+
+      # Agent settings
+      AGENT_MAX_ITERATIONS: "25"
+      AGENT_TIMEOUT_SECONDS: "300"
+      MAX_CONCURRENT_INVESTIGATIONS: "3"
+
+      # Feature flags
+      FEATURE_AUTO_REMEDIATION: "false"
+      FEATURE_AUTO_ROLLBACK: "false"
+      FEATURE_POSTMORTEM_GENERATION: "true"
+      FEATURE_SLACK_NOTIFICATIONS: ${FEATURE_SLACK_NOTIFICATIONS:-false}
+      FEATURE_JIRA_INTEGRATION: ${FEATURE_JIRA_INTEGRATION:-false}
+      FEATURE_GITHUB_INTEGRATION: ${FEATURE_GITHUB_INTEGRATION:-false}
+      FEATURE_COST_TRACKING: "true"
+      FEATURE_AUDIT_LOG: "true"
+      FEATURE_VECTOR_SEARCH: "true"
+
+      # Integrations (optional for local dev)
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      SLACK_BOT_TOKEN: ${SLACK_BOT_TOKEN:-}
+      SLACK_SIGNING_SECRET: ${SLACK_SIGNING_SECRET:-}
+      JIRA_URL: ${JIRA_URL:-}
+      JIRA_TOKEN: ${JIRA_TOKEN:-}
+      JIRA_USER_EMAIL: ${JIRA_USER_EMAIL:-}
+      PAGERDUTY_API_KEY: ${PAGERDUTY_API_KEY:-}
+
+      # JWT
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      JWT_ALGORITHM: HS256
+      JWT_ACCESS_TOKEN_EXPIRE_MINUTES: "60"
+
+      # Prometheus
+      MCP_PROMETHEUS_ENDPOINT: http://prometheus:9090
+      MCP_GRAFANA_ENDPOINT: http://grafana:3000
+
+      # CORS
+      CORS_ORIGINS: "http://localhost:3000,http://127.0.0.1:3000"
+      FRONTEND_URL: "http://localhost:3000"
+
+      # Metrics
+      METRICS_ENABLED: "true"
+      METRICS_PORT: "9090"
+      TRACING_ENABLED: "false"
+
+    volumes:
+      - ./backend:/app:cached
+      - backend_logs:/app/logs
+    command: >
+      uvicorn app.main:app
+      --host 0.0.0.0
+      --port 8000
+      --reload
+      --reload-dir /app/app
+      --log-level debug
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health/live"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 1G
+
+  # ── Atlas AI Frontend (Next.js) ─────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: development
+    container_name: atlas-ai-frontend
+    restart: unless-stopped
+    networks:
+      - atlas-net
+    ports:
+      - "3000:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      <<: *common-env
+      NODE_ENV: development
+      PORT: "3000"
+      NEXT_PUBLIC_API_URL: http://localhost:8000/api/v1
+      NEXT_PUBLIC_APP_NAME: "Atlas AI"
+      NEXT_PUBLIC_APP_VERSION: "1.0.0-dev"
+      NEXT_PUBLIC_WS_URL: ws://localhost:8000/api/v1/ws
+      NEXT_PUBLIC_ENVIRONMENT: development
+      BACKEND_URL: http://backend:8000
+      NEXTAUTH_URL: http://localhost:3000
+      NEXTAUTH_SECRET: ${JWT_SECRET_KEY}
+    volumes:
+      - ./frontend:/app:cached
+      - /app/node_modules
+      - /app/.next
+    command: npm run dev
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
+
+  # ── Prometheus ──────────────────────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:v2.52.0
+    container_name: atlas-ai-prometheus
+    restart: unless-stopped
+    networks:
+      - atlas-net
+    ports:
+      - "9091:9090"
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=15d"
+      - "--web.console.libraries=/usr/share/prometheus/console_libraries"
+      - "--web.console.templates=/usr/share/prometheus/consoles"
+      - "--web.enable-lifecycle"
+      - "--web.enable-admin-api"
+    volumes:
+      - prometheus_data:/prometheus
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/alert_rules.yml:/etc/prometheus/alert_rules.yml:ro
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9090/-/healthy"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    logging: *default-logging
+
+  # ── Grafana ──────────────────────────────────────────────────────────────────
+  grafana:
+    image: grafana/grafana-oss:10.4.0
+    container_name: atlas-ai-grafana
+    restart: unless-stopped
+    networks:
+      - atlas-net
+    ports:
+      - "3001:3000"
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-grafana}
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /etc/grafana/dashboards/atlas-ai-platform.json
+      GF_INSTALL_PLUGINS: "grafana-piechart-panel"
+      GF_SERVER_ROOT_URL: http://localhost:3001
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./k8s/monitoring/grafana-dashboard.json:/etc/grafana/dashboards/atlas-ai-platform.json:ro
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    logging: *default-logging

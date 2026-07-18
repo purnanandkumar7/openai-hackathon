@@ -1,0 +1,210 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: atlas-ai-backend
+  namespace: atlas-ai
+  labels:
+    app.kubernetes.io/name: atlas-ai-backend
+    app.kubernetes.io/component: backend
+    app.kubernetes.io/part-of: atlas-ai-platform
+    app.kubernetes.io/version: "1.0.0"
+  annotations:
+    deployment.kubernetes.io/revision: "1"
+spec:
+  replicas: 3
+  revisionHistoryLimit: 5
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: atlas-ai-backend
+      app.kubernetes.io/component: backend
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: atlas-ai-backend
+        app.kubernetes.io/component: backend
+        app.kubernetes.io/part-of: atlas-ai-platform
+        app.kubernetes.io/version: "1.0.0"
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+        # Force rollout on configmap/secret change:
+        checksum/config: "{{ include (print $.Template.BasePath \"/configmap.yaml\") . | sha256sum }}"
+    spec:
+      serviceAccountName: atlas-ai-sa
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      terminationGracePeriodSeconds: 60
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: atlas-ai-backend
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/name: atlas-ai-backend
+                topologyKey: kubernetes.io/hostname
+      containers:
+        - name: backend
+          image: ghcr.io/company/atlas-ai-backend:1.0.0
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+            - name: metrics
+              containerPort: 9090
+              protocol: TCP
+
+          # ── Environment from ConfigMap ────────────────────────────────────
+          envFrom:
+            - configMapRef:
+                name: atlas-ai-config
+          env:
+            # ── Secrets (individual keys from Secret) ──────────────────────
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: atlas-ai-secrets
+                  key: OPENAI_API_KEY
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: atlas-ai-secrets
+                  key: DATABASE_URL
+            - name: REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: atlas-ai-secrets
+                  key: REDIS_URL
+            - name: GITHUB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: atlas-ai-secrets
+                  key: GITHUB_TOKEN
+            - name: SLACK_BOT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: atlas-ai-secrets
+                  key: SLACK_BOT_TOKEN
+            - name: SLACK_SIGNING_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: atlas-ai-secrets
+                  key: SLACK_SIGNING_SECRET
+            - name: JIRA_URL
+              valueFrom:
+                secretKeyRef:
+                  name: atlas-ai-secrets
+                  key: JIRA_URL
+            - name: JIRA_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: atlas-ai-secrets
+                  key: JIRA_TOKEN
+            - name: JWT_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: atlas-ai-secrets
+                  key: JWT_SECRET_KEY
+            - name: PAGERDUTY_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: atlas-ai-secrets
+                  key: PAGERDUTY_API_KEY
+            # ── Downward API ───────────────────────────────────────────────
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "512Mi"
+            limits:
+              cpu: "2000m"
+              memory: "2Gi"
+
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: http
+              scheme: HTTP
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            timeoutSeconds: 5
+            successThreshold: 1
+            failureThreshold: 3
+
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+              scheme: HTTP
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 5
+            successThreshold: 1
+            failureThreshold: 3
+
+          startupProbe:
+            httpGet:
+              path: /health/startup
+              port: http
+              scheme: HTTP
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 24  # Allow up to 2 minutes startup time
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: app-logs
+              mountPath: /app/logs
+
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: app-logs
+          emptyDir: {}
+
+      imagePullSecrets:
+        - name: ghcr-registry-secret

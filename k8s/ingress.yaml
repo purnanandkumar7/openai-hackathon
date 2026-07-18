@@ -1,0 +1,113 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: atlas-ai-ingress
+  namespace: atlas-ai
+  labels:
+    app.kubernetes.io/name: atlas-ai
+    app.kubernetes.io/component: ingress
+    app.kubernetes.io/part-of: atlas-ai-platform
+  annotations:
+    # ── NGINX Ingress Controller ───────────────────────────────────────────
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/use-regex: "true"
+
+    # ── TLS / SSL ──────────────────────────────────────────────────────────
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+
+    # ── WebSocket upgrade (for real-time investigation streams) ───────────
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      proxy_set_header Upgrade $http_upgrade;
+      proxy_set_header Connection $connection_upgrade;
+      proxy_http_version 1.1;
+      proxy_cache_bypass $http_upgrade;
+
+    # ── Request limits ────────────────────────────────────────────────────
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/client-body-buffer-size: "1m"
+
+    # ── Rate Limiting ─────────────────────────────────────────────────────
+    nginx.ingress.kubernetes.io/limit-rps: "30"
+    nginx.ingress.kubernetes.io/limit-connections: "20"
+
+    # ── CORS ──────────────────────────────────────────────────────────────
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "https://atlas-ai.company.com"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, DELETE, PATCH, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-headers: "Authorization, Content-Type, X-Request-ID, X-Correlation-ID"
+    nginx.ingress.kubernetes.io/cors-max-age: "3600"
+
+    # ── Security Headers ──────────────────────────────────────────────────
+    nginx.ingress.kubernetes.io/server-snippet: |
+      add_header X-Frame-Options "SAMEORIGIN" always;
+      add_header X-XSS-Protection "1; mode=block" always;
+      add_header X-Content-Type-Options "nosniff" always;
+      add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+      add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' wss://atlas-ai.company.com;" always;
+      add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
+
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - atlas-ai.company.com
+      secretName: atlas-ai-tls-cert
+  rules:
+    - host: atlas-ai.company.com
+      http:
+        paths:
+          # ── Backend API routes ─────────────────────────────────────────
+          - path: /api(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: atlas-ai-backend-service
+                port:
+                  name: http
+
+          # ── WebSocket endpoint for investigation streaming ─────────────
+          - path: /ws(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: atlas-ai-backend-service
+                port:
+                  name: http
+
+          # ── Health/metrics endpoints (backend) ─────────────────────────
+          - path: /health(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: atlas-ai-backend-service
+                port:
+                  name: http
+
+          # ── Frontend (catch-all) ───────────────────────────────────────
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: atlas-ai-frontend-service
+                port:
+                  name: http
+---
+# ConfigMap for NGINX upstream map required for WebSocket upgrades
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-connection-upgrade
+  namespace: ingress-nginx
+  labels:
+    app.kubernetes.io/part-of: atlas-ai-platform
+data:
+  map: |
+    map $http_upgrade $connection_upgrade {
+      default upgrade;
+      ''      close;
+    }

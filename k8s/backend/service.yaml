@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: atlas-ai-backend-service
+  namespace: atlas-ai
+  labels:
+    app.kubernetes.io/name: atlas-ai-backend
+    app.kubernetes.io/component: backend
+    app.kubernetes.io/part-of: atlas-ai-platform
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9090"
+    prometheus.io/path: "/metrics"
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: atlas-ai-backend
+    app.kubernetes.io/component: backend
+  ports:
+    - name: http
+      protocol: TCP
+      port: 80
+      targetPort: http
+    - name: metrics
+      protocol: TCP
+      port: 9090
+      targetPort: metrics

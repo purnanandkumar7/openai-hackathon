@@ -1,0 +1,876 @@
+openapi: 3.1.0
+
+info:
+  title: Atlas AI API
+  version: 1.0.0
+  description: |
+    Atlas AI is an autonomous enterprise engineer that investigates and resolves production incidents using multi-agent AI.
+    
+    This API provides endpoints for:
+    - Creating and managing incidents
+    - Triggering autonomous investigations
+    - Retrieving RCA reports
+    - Approving or rejecting remediation actions
+    - Monitoring agent execution
+    - Real-time progress streaming via WebSocket
+    
+    ## Authentication
+    All endpoints require JWT Bearer token authentication. Include the token in the Authorization header:
+    ```
+    Authorization: Bearer <your_jwt_token>
+    ```
+    
+    Tokens are issued by the Atlas AI auth service and carry role-based permissions.
+    
+    ## Rate Limiting
+    - 1,000 requests per minute per API key
+    - 10,000 requests per hour per API key
+    - WebSocket connections: 5 concurrent per user
+    
+    Rate limit headers are included in all responses:
+    - `X-RateLimit-Limit`: requests per window
+    - `X-RateLimit-Remaining`: requests remaining
+    - `X-RateLimit-Reset`: Unix timestamp when the limit resets
+    
+  contact:
+    name: Atlas AI Platform Team
+    email: atlas-ai@company.com
+  license:
+    name: Proprietary
+    
+servers:
+  - url: https://api.atlas-ai.company.com/api/v1
+    description: Production
+  - url: https://api.staging.atlas-ai.company.com/api/v1
+    description: Staging
+  - url: http://localhost:8000/api/v1
+    description: Local development
+
+security:
+  - BearerAuth: []
+
+tags:
+  - name: Incidents
+    description: Incident creation, retrieval, and lifecycle management
+  - name: Investigation
+    description: Triggering and monitoring autonomous investigations
+  - name: RCA
+    description: Root cause analysis retrieval and approval
+  - name: Agents
+    description: Agent status and execution monitoring
+  - name: Metrics
+    description: System metrics and observability
+
+paths:
+  /incidents:
+    post:
+      tags: [Incidents]
+      summary: Create a new incident
+      description: |
+        Creates a new incident record. Can be triggered manually or via webhook from external alerting systems (PagerDuty, Prometheus AlertManager).
+        
+        If an incident with the same external_id already exists, returns the existing incident (idempotent).
+      operationId: createIncident
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateIncidentRequest'
+            examples:
+              manual:
+                summary: Manual incident creation
+                value:
+                  title: "payment-service high error rate"
+                  severity: "P1"
+                  service_name: "payment-service"
+                  alert_name: "error_rate_high"
+                  description: "5xx error rate exceeded 5% threshold for 3 minutes"
+                  external_id: "PD-ABC123"
+                  metadata:
+                    pagerduty_incident_url: "https://company.pagerduty.com/incidents/ABC123"
+                    alert_source: "prometheus"
+              webhook:
+                summary: PagerDuty webhook payload
+                value:
+                  title: "Database connection pool exhausted"
+                  severity: "P2"
+                  service_name: "checkout-service"
+                  alert_name: "db_connection_pool_exhausted"
+                  external_id: "PD-XYZ789"
+                  metadata:
+                    pagerduty_incident_key: "db_pool_exhausted_checkout"
+      responses:
+        '201':
+          description: Incident created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Incident'
+        '200':
+          description: Incident already exists (idempotent)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Incident'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+      
+    get:
+      tags: [Incidents]
+      summary: List incidents
+      description: |
+        Retrieve a paginated list of incidents with optional filtering.
+        
+        Uses cursor-based pagination for stable ordering even as new incidents are created.
+      operationId: listIncidents
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [created, investigating, rca_complete, awaiting_approval, remediating, resolved, archived]
+          description: Filter by incident status
+        - name: severity
+          in: query
+          schema:
+            type: string
+            enum: [P1, P2, P3, P4]
+          description: Filter by severity
+        - name: service_name
+          in: query
+          schema:
+            type: string
+          description: Filter by affected service
+        - name: after
+          in: query
+          schema:
+            type: string
+          description: Cursor for pagination (get incidents after this cursor)
+        - name: before
+          in: query
+          schema:
+            type: string
+          description: Cursor for pagination (get incidents before this cursor)
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+          description: Number of results per page
+      responses:
+        '200':
+          description: List of incidents
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Incident'
+                  pagination:
+                    $ref: '#/components/schemas/PaginationMetadata'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  
+  /incidents/{incident_id}:
+    get:
+      tags: [Incidents]
+      summary: Get incident by ID
+      operationId: getIncident
+      parameters:
+        - $ref: '#/components/parameters/IncidentId'
+      responses:
+        '200':
+          description: Incident details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IncidentDetail'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    
+    patch:
+      tags: [Incidents]
+      summary: Update incident
+      description: Update mutable fields of an incident (severity, status, assignee)
+      operationId: updateIncident
+      parameters:
+        - $ref: '#/components/parameters/IncidentId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateIncidentRequest'
+      responses:
+        '200':
+          description: Incident updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Incident'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    
+    delete:
+      tags: [Incidents]
+      summary: Archive incident
+      description: Soft-delete an incident (sets status to 'archived')
+      operationId: archiveIncident
+      parameters:
+        - $ref: '#/components/parameters/IncidentId'
+      responses:
+        '204':
+          description: Incident archived
+        '404':
+          $ref: '#/components/responses/NotFound'
+  
+  /incidents/{incident_id}/investigate:
+    post:
+      tags: [Investigation]
+      summary: Trigger investigation
+      description: |
+        Trigger an autonomous investigation for an incident. This dispatches the Planning Agent followed by specialist agents.
+        
+        Idempotent: if an investigation is already in progress, returns the existing investigation ID.
+      operationId: triggerInvestigation
+      parameters:
+        - $ref: '#/components/parameters/IncidentId'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                force_restart:
+                  type: boolean
+                  description: If true, cancel any in-progress investigation and start fresh
+                  default: false
+      responses:
+        '202':
+          description: Investigation started
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  investigation_id:
+                    type: string
+                    example: "inv_01HX4KQRS7ABC"
+                  status:
+                    type: string
+                    enum: [started, in_progress]
+                  estimated_duration_seconds:
+                    type: integer
+                    example: 180
+        '409':
+          description: Investigation already in progress
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error:
+                  code: INVESTIGATION_IN_PROGRESS
+                  message: An investigation is already running for this incident
+                  details:
+                    investigation_id: "inv_01HX4KQRS7ABC"
+  
+  /incidents/{incident_id}/rca:
+    get:
+      tags: [RCA]
+      summary: Get RCA report
+      description: Retrieve the root cause analysis report for an incident
+      operationId: getRCA
+      parameters:
+        - $ref: '#/components/parameters/IncidentId'
+      responses:
+        '200':
+          description: RCA report
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RCAReport'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '425':
+          description: RCA not yet available (investigation in progress)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  
+  /incidents/{incident_id}/rca/approve:
+    post:
+      tags: [RCA]
+      summary: Approve or reject remediation
+      description: |
+        Approve or reject the proposed remediation actions in an RCA.
+        
+        Requires 'approver' role. For high-risk actions, requires two approvals.
+      operationId: approveRCA
+      parameters:
+        - $ref: '#/components/parameters/IncidentId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApprovalRequest'
+      responses:
+        '200':
+          description: Approval recorded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [approved, rejected, pending_second_approval]
+                  remediation_status:
+                    type: string
+                    enum: [queued, in_progress, complete]
+                  estimated_completion_time:
+                    type: string
+                    format: date-time
+        '403':
+          description: Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  
+  /agents:
+    get:
+      tags: [Agents]
+      summary: List all agent types
+      description: Get status and metadata for all agent types in the system
+      operationId: listAgents
+      responses:
+        '200':
+          description: List of agents
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  agents:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AgentMetadata'
+  
+  /agents/{agent_type}/runs:
+    get:
+      tags: [Agents]
+      summary: List agent runs
+      description: Get execution history for a specific agent type
+      operationId: listAgentRuns
+      parameters:
+        - name: agent_type
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [planning, kubernetes, github, storage, network, security, rca, documentation, cost]
+        - name: incident_id
+          in: query
+          schema:
+            type: string
+          description: Filter by incident
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [running, completed, failed, timeout]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+      responses:
+        '200':
+          description: Agent run list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  runs:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AgentRun'
+  
+  /metrics:
+    get:
+      tags: [Metrics]
+      summary: Prometheus metrics
+      description: Metrics scrape endpoint in Prometheus text format
+      operationId: getMetrics
+      responses:
+        '200':
+          description: Metrics in Prometheus format
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: |
+                # HELP atlas_incidents_total Total incidents by severity and status
+                # TYPE atlas_incidents_total counter
+                atlas_incidents_total{severity="P1",status="resolved"} 142
+                atlas_incidents_total{severity="P2",status="investigating"} 3
+                # HELP atlas_investigation_duration_seconds Investigation duration
+                # TYPE atlas_investigation_duration_seconds histogram
+                atlas_investigation_duration_seconds_bucket{le="60"} 45
+                atlas_investigation_duration_seconds_bucket{le="120"} 89
+                atlas_investigation_duration_seconds_bucket{le="300"} 142
+                atlas_investigation_duration_seconds_sum 18534
+                atlas_investigation_duration_seconds_count 142
+  
+  /health:
+    get:
+      tags: [Metrics]
+      summary: Health check
+      description: Health status with dependency checks
+      operationId: healthCheck
+      security: []  # No auth required
+      responses:
+        '200':
+          description: System healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+        '503':
+          description: System unhealthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        JWT tokens are issued by the auth service. Include in the Authorization header:
+        ```
+        Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
+        ```
+  
+  parameters:
+    IncidentId:
+      name: incident_id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Incident ID (format: inc_<ulid>)
+      example: "inc_01HX4KQRS7ABC123"
+  
+  schemas:
+    CreateIncidentRequest:
+      type: object
+      required:
+        - title
+        - severity
+        - service_name
+      properties:
+        title:
+          type: string
+          maxLength: 500
+          example: "payment-service high error rate"
+        severity:
+          type: string
+          enum: [P1, P2, P3, P4]
+          description: |
+            P1 = Critical (service down, major revenue impact)
+            P2 = High (degraded service, customer impact)
+            P3 = Medium (minor impact, no customer visibility)
+            P4 = Low (cosmetic, no functional impact)
+        service_name:
+          type: string
+          example: "payment-service"
+        alert_name:
+          type: string
+          example: "error_rate_high"
+        description:
+          type: string
+          example: "5xx error rate exceeded 5% threshold"
+        external_id:
+          type: string
+          description: External incident ID (PagerDuty, Jira, etc.) for deduplication
+          example: "PD-ABC123"
+        metadata:
+          type: object
+          additionalProperties: true
+          description: Arbitrary metadata from alerting system
+    
+    UpdateIncidentRequest:
+      type: object
+      properties:
+        severity:
+          type: string
+          enum: [P1, P2, P3, P4]
+        status:
+          type: string
+          enum: [created, investigating, rca_complete, awaiting_approval, remediating, resolved, archived]
+        assignee:
+          type: string
+          description: User ID of assigned engineer
+    
+    Incident:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "inc_01HX4KQRS7ABC"
+        title:
+          type: string
+        severity:
+          type: string
+          enum: [P1, P2, P3, P4]
+        status:
+          type: string
+          enum: [created, investigating, rca_complete, awaiting_approval, remediating, resolved, archived]
+        service_name:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        resolved_at:
+          type: string
+          format: date-time
+          nullable: true
+    
+    IncidentDetail:
+      allOf:
+        - $ref: '#/components/schemas/Incident'
+        - type: object
+          properties:
+            alert_name:
+              type: string
+            description:
+              type: string
+            external_id:
+              type: string
+            metadata:
+              type: object
+            investigation_id:
+              type: string
+              nullable: true
+            rca_id:
+              type: string
+              nullable: true
+            agent_runs:
+              type: array
+              items:
+                $ref: '#/components/schemas/AgentRun'
+    
+    AgentRun:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "run_01HX4KQRS7ABC"
+        agent_type:
+          type: string
+          enum: [planning, kubernetes, github, storage, network, security, rca, documentation, cost]
+        incident_id:
+          type: string
+        status:
+          type: string
+          enum: [running, completed, failed, timeout]
+        started_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+        duration_seconds:
+          type: number
+          nullable: true
+        tool_calls_count:
+          type: integer
+        findings:
+          type: object
+          description: Structured findings from the agent
+    
+    RCAReport:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "rca_01HX4KQRS7ABC"
+        incident_id:
+          type: string
+        root_cause:
+          type: string
+          example: "PostgreSQL connection pool exhausted due to CACHE_MAX_ENTRIES=0"
+        causal_chain:
+          type: string
+          example: "Config deployed → cache grew unbounded → OOMKill → capacity loss → error spike"
+        confidence_score:
+          type: integer
+          minimum: 0
+          maximum: 100
+          example: 94
+        contributing_factors:
+          type: array
+          items:
+            type: string
+        timeline:
+          type: array
+          items:
+            type: object
+            properties:
+              time:
+                type: string
+                format: date-time
+              event:
+                type: string
+        remediation_actions:
+          type: array
+          items:
+            $ref: '#/components/schemas/RemediationAction'
+        executive_summary:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+    
+    RemediationAction:
+      type: object
+      properties:
+        action_id:
+          type: string
+          example: "REM-001"
+        priority:
+          type: integer
+          minimum: 1
+          maximum: 4
+          description: "1=immediate, 2=urgent, 3=important, 4=preventive"
+        title:
+          type: string
+        steps:
+          type: array
+          items:
+            type: string
+        risk_level:
+          type: string
+          enum: [low, medium, high]
+        rollback_procedure:
+          type: string
+        estimated_time_minutes:
+          type: integer
+    
+    ApprovalRequest:
+      type: object
+      required:
+        - decision
+      properties:
+        decision:
+          type: string
+          enum: [approve, reject, approve_selected]
+        action_ids:
+          type: array
+          items:
+            type: string
+          description: Required if decision is 'approve_selected'
+        comment:
+          type: string
+          description: Optional comment explaining the decision
+    
+    AgentMetadata:
+      type: object
+      properties:
+        agent_type:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+          enum: [available, degraded, unavailable]
+        total_runs:
+          type: integer
+        success_rate_percent:
+          type: number
+        avg_duration_seconds:
+          type: number
+    
+    PaginationMetadata:
+      type: object
+      properties:
+        next_cursor:
+          type: string
+          nullable: true
+        prev_cursor:
+          type: string
+          nullable: true
+        has_more:
+          type: boolean
+        total_count:
+          type: integer
+          description: Total count (may be approximate for large result sets)
+    
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded, unhealthy]
+        timestamp:
+          type: string
+          format: date-time
+        version:
+          type: string
+        dependencies:
+          type: object
+          properties:
+            postgresql:
+              $ref: '#/components/schemas/DependencyStatus'
+            redis:
+              $ref: '#/components/schemas/DependencyStatus'
+            mcp_servers:
+              $ref: '#/components/schemas/DependencyStatus'
+    
+    DependencyStatus:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [up, down, degraded]
+        latency_ms:
+          type: number
+        message:
+          type: string
+    
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              example: "INVALID_REQUEST"
+            message:
+              type: string
+              example: "Field 'severity' is required"
+            details:
+              type: object
+              additionalProperties: true
+  
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: INVALID_REQUEST
+              message: "Validation failed"
+              details:
+                field: "severity"
+                issue: "must be one of P1, P2, P3, P4"
+    
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: UNAUTHORIZED
+              message: "Invalid or missing JWT token"
+    
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: NOT_FOUND
+              message: "Incident not found"
+    
+    RateLimited:
+      description: Rate limit exceeded
+      headers:
+        X-RateLimit-Limit:
+          schema:
+            type: integer
+        X-RateLimit-Remaining:
+          schema:
+            type: integer
+        X-RateLimit-Reset:
+          schema:
+            type: integer
+            format: int64
+        Retry-After:
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: RATE_LIMIT_EXCEEDED
+              message: "Rate limit of 1000 requests per minute exceeded"
+              details:
+                retry_after_seconds: 42
+
+# WebSocket endpoint documentation (not part of OpenAPI but documented here)
+# 
+# WebSocket: ws://host/ws/incidents/{incident_id}/progress
+# 
+# Authentication: Pass JWT as query parameter: ?token=<jwt>
+# 
+# Message format (server -> client):
+# {
+#   "type": "agent_started" | "tool_call" | "agent_completed" | "investigation_complete",
+#   "timestamp": "ISO 8601",
+#   "data": {
+#     "agent_type": "kubernetes",
+#     "tool_name": "k8s_get_pod_status",
+#     "tool_input": {...},
+#     "tool_output": {...},
+#     "status": "running" | "completed" | "failed"
+#   }
+# }
+# 
+# Example messages:
+# 
+# Agent started:
+# {"type": "agent_started", "timestamp": "2025-01-15T10:30:00Z", "data": {"agent_type": "kubernetes", "status": "running"}}
+# 
+# Tool call:
+# {"type": "tool_call", "timestamp": "2025-01-15T10:30:05Z", "data": {"agent_type": "kubernetes", "tool_name": "k8s_get_pod_status", "tool_input": {"namespace": "payments", "selector": "app=payment-service"}}}
+# 
+# Agent completed:
+# {"type": "agent_completed", "timestamp": "2025-01-15T10:31:30Z", "data": {"agent_type": "kubernetes", "status": "completed", "duration_seconds": 85, "findings_summary": "3 pods OOMKilled"}}
+# 
+# Investigation complete:
+# {"type": "investigation_complete", "timestamp": "2025-01-15T10:35:00Z", "data": {"rca_id": "rca_01HX4KQRS7ABC", "confidence_score": 94}}

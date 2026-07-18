@@ -1,0 +1,98 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 239 84% 67%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 50.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 239 84% 67%;
+    --radius: 0.5rem;
+  }
+
+  /* Force dark theme */
+  html {
+    color-scheme: dark;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: hsl(217.2 32.6% 10%);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: hsl(217.2 32.6% 30%);
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(239 84% 67%);
+  }
+}
+
+@layer components {
+  .glass-card {
+    @apply bg-slate-900/60 border border-slate-700/50 backdrop-blur-sm;
+  }
+
+  .gradient-text {
+    @apply bg-gradient-to-r from-indigo-400 to-violet-400 bg-clip-text text-transparent;
+  }
+
+  .atlas-glow {
+    box-shadow: 0 0 20px rgba(99, 102, 241, 0.15), 0 0 60px rgba(99, 102, 241, 0.05);
+  }
+
+  .severity-p1 {
+    @apply bg-red-500/15 text-red-400 border border-red-500/30;
+  }
+  .severity-p2 {
+    @apply bg-orange-500/15 text-orange-400 border border-orange-500/30;
+  }
+  .severity-p3 {
+    @apply bg-yellow-500/15 text-yellow-400 border border-yellow-500/30;
+  }
+  .severity-p4 {
+    @apply bg-blue-500/15 text-blue-400 border border-blue-500/30;
+  }
+
+  .status-open {
+    @apply bg-red-500/20 text-red-400;
+  }
+  .status-investigating {
+    @apply bg-amber-500/20 text-amber-400;
+  }
+  .status-resolved {
+    @apply bg-emerald-500/20 text-emerald-400;
+  }
+  .status-closed {
+    @apply bg-slate-500/20 text-slate-400;
+  }
+}

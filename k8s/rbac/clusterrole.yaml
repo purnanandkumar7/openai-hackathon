@@ -1,0 +1,99 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: atlas-ai-cluster-reader
+  labels:
+    app.kubernetes.io/name: atlas-ai
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/part-of: atlas-ai-platform
+  annotations:
+    description: >
+      Read-only ClusterRole for Atlas AI agents. Grants visibility across all
+      namespaces for infrastructure diagnostics. No write permissions are
+      granted — remediation actions require explicit human approval via the UI.
+rules:
+  # ── Core API group ────────────────────────────────────────────────────────
+  - apiGroups: [""]
+    resources:
+      - pods
+      - pods/log
+      - pods/status
+      - pods/exec        # needed by diagnosis agent to inspect container state
+      - services
+      - endpoints
+      - nodes
+      - nodes/metrics
+      - nodes/status
+      - namespaces
+      - events
+      - persistentvolumeclaims
+      - persistentvolumes
+      - configmaps
+      - resourcequotas
+      - limitranges
+      - serviceaccounts
+      - replicationcontrollers
+    verbs: ["get", "list", "watch"]
+
+  # ── Apps API group ────────────────────────────────────────────────────────
+  - apiGroups: ["apps"]
+    resources:
+      - deployments
+      - deployments/status
+      - replicasets
+      - statefulsets
+      - statefulsets/status
+      - daemonsets
+      - daemonsets/status
+      - controllerrevisions
+    verbs: ["get", "list", "watch"]
+
+  # ── Autoscaling ───────────────────────────────────────────────────────────
+  - apiGroups: ["autoscaling"]
+    resources:
+      - horizontalpodautoscalers
+    verbs: ["get", "list", "watch"]
+
+  # ── Batch ─────────────────────────────────────────────────────────────────
+  - apiGroups: ["batch"]
+    resources:
+      - jobs
+      - cronjobs
+    verbs: ["get", "list", "watch"]
+
+  # ── Networking ────────────────────────────────────────────────────────────
+  - apiGroups: ["networking.k8s.io"]
+    resources:
+      - ingresses
+      - ingresses/status
+      - networkpolicies
+    verbs: ["get", "list", "watch"]
+
+  # ── Policy ────────────────────────────────────────────────────────────────
+  - apiGroups: ["policy"]
+    resources:
+      - poddisruptionbudgets
+    verbs: ["get", "list", "watch"]
+
+  # ── Metrics API ───────────────────────────────────────────────────────────
+  - apiGroups: ["metrics.k8s.io"]
+    resources:
+      - pods
+      - nodes
+    verbs: ["get", "list"]
+
+  # ── Storage ───────────────────────────────────────────────────────────────
+  - apiGroups: ["storage.k8s.io"]
+    resources:
+      - storageclasses
+      - volumeattachments
+    verbs: ["get", "list", "watch"]
+
+  # ── RBAC (read-only, for audit) ───────────────────────────────────────────
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources:
+      - roles
+      - rolebindings
+      - clusterroles
+      - clusterrolebindings
+    verbs: ["get", "list", "watch"]

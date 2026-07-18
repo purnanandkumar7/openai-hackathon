@@ -1,0 +1,169 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: atlas-ai-backend-monitor
+  namespace: atlas-ai
+  labels:
+    app.kubernetes.io/name: atlas-ai-backend
+    app.kubernetes.io/component: monitoring
+    app.kubernetes.io/part-of: atlas-ai-platform
+    # This label must match the Prometheus Operator's serviceMonitorSelector
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: atlas-ai-backend
+      app.kubernetes.io/component: backend
+  namespaceSelector:
+    matchNames:
+      - atlas-ai
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 15s
+      scrapeTimeout: 10s
+      scheme: http
+      honorLabels: true
+      metricRelabelings:
+        # Drop high-cardinality debug metrics
+        - sourceLabels: [__name__]
+          regex: "go_.*|process_.*"
+          action: drop
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_pod_name]
+          targetLabel: pod
+        - sourceLabels: [__meta_kubernetes_namespace]
+          targetLabel: namespace
+        - sourceLabels: [__meta_kubernetes_pod_node_name]
+          targetLabel: node
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: atlas-ai-postgres-monitor
+  namespace: atlas-ai
+  labels:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/component: monitoring
+    app.kubernetes.io/part-of: atlas-ai-platform
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: postgres
+      app.kubernetes.io/component: database
+  namespaceSelector:
+    matchNames:
+      - atlas-ai
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 15s
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: atlas-ai-redis-monitor
+  namespace: atlas-ai
+  labels:
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/component: monitoring
+    app.kubernetes.io/part-of: atlas-ai-platform
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: redis
+      app.kubernetes.io/component: cache
+  namespaceSelector:
+    matchNames:
+      - atlas-ai
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 15s
+      scrapeTimeout: 10s
+---
+# PrometheusRule: alerting rules for Atlas AI
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: atlas-ai-alerts
+  namespace: atlas-ai
+  labels:
+    app.kubernetes.io/name: atlas-ai
+    app.kubernetes.io/component: monitoring
+    app.kubernetes.io/part-of: atlas-ai-platform
+    release: prometheus
+spec:
+  groups:
+    - name: atlas-ai.backend
+      interval: 30s
+      rules:
+        - alert: AtlasAIBackendDown
+          expr: up{job="atlas-ai-backend-service"} == 0
+          for: 2m
+          labels:
+            severity: critical
+            team: platform-engineering
+          annotations:
+            summary: "Atlas AI backend is down"
+            description: "The Atlas AI backend pod {{ $labels.pod }} has been down for more than 2 minutes."
+
+        - alert: AtlasAIHighAgentErrorRate
+          expr: |
+            rate(atlas_ai_agent_errors_total[5m])
+            / rate(atlas_ai_agent_runs_total[5m]) > 0.1
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Atlas AI agent error rate > 10%"
+            description: "Agent {{ $labels.agent_name }} error rate is {{ $value | humanizePercentage }}."
+
+        - alert: AtlasAISlowInvestigation
+          expr: |
+            histogram_quantile(0.95,
+              rate(atlas_ai_investigation_duration_seconds_bucket[10m])
+            ) > 300
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "P95 investigation duration exceeds 5 minutes"
+            description: "95th percentile investigation duration is {{ $value | humanizeDuration }}."
+
+        - alert: AtlasAIBackendHighMemory
+          expr: |
+            container_memory_working_set_bytes{
+              namespace="atlas-ai",
+              container="backend"
+            } / container_spec_memory_limit_bytes{
+              namespace="atlas-ai",
+              container="backend"
+            } > 0.85
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Atlas AI backend memory usage > 85%"
+            description: "Pod {{ $labels.pod }} is using {{ $value | humanizePercentage }} of its memory limit."
+
+        - alert: AtlasAIPostgresDown
+          expr: pg_up{namespace="atlas-ai"} == 0
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Atlas AI PostgreSQL is down"
+            description: "The Atlas AI PostgreSQL instance has been unavailable for > 1 minute."
+
+        - alert: AtlasAIRedisDown
+          expr: redis_up{namespace="atlas-ai"} == 0
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Atlas AI Redis is down"
+            description: "The Atlas AI Redis instance has been unavailable for > 1 minute."

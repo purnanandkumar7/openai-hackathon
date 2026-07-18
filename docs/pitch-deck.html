@@ -1,0 +1,1218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Atlas AI — The Autonomous Enterprise Engineer</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #0a0a0f;
+      --surface:  #12121a;
+      --surface2: #1a1a26;
+      --border:   #1e1e2e;
+      --blue:     #3b82f6;
+      --purple:   #8b5cf6;
+      --green:    #22c55e;
+      --red:      #ef4444;
+      --amber:    #f59e0b;
+      --text:     #e2e8f0;
+      --muted:    #64748b;
+      --font:     system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Slide shell ──────────────────────────────────────────── */
+    .slide {
+      min-height: 100vh;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 80px 10%;
+      position: relative;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .slide-number {
+      position: absolute;
+      top: 32px;
+      left: 10%;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .slide-number span {
+      color: var(--blue);
+    }
+
+    /* progress bar across top */
+    .progress-bar {
+      position: fixed;
+      top: 0; left: 0;
+      height: 3px;
+      width: 100%;
+      background: linear-gradient(90deg, var(--blue), var(--purple));
+      z-index: 100;
+    }
+
+    /* ── Typography ───────────────────────────────────────────── */
+    h1 { font-size: clamp(2.8rem, 6vw, 5.5rem); font-weight: 800; line-height: 1.05; letter-spacing: -.03em; }
+    h2 { font-size: clamp(1.8rem, 3.5vw, 3rem);  font-weight: 700; line-height: 1.15; letter-spacing: -.02em; }
+    h3 { font-size: clamp(1rem, 1.8vw, 1.35rem); font-weight: 600; }
+    p  { font-size: clamp(.9rem, 1.3vw, 1.1rem); color: #94a3b8; }
+
+    .gradient-text {
+      background: linear-gradient(135deg, var(--blue) 0%, var(--purple) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .label {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      color: var(--blue);
+      margin-bottom: 18px;
+    }
+
+    /* ── Cards & surfaces ─────────────────────────────────────── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 28px 24px;
+    }
+
+    .card-accent-blue  { border-top: 3px solid var(--blue); }
+    .card-accent-purple{ border-top: 3px solid var(--purple); }
+    .card-accent-green { border-top: 3px solid var(--green); }
+    .card-accent-amber { border-top: 3px solid var(--amber); }
+
+    .pill {
+      display: inline-block;
+      padding: 4px 14px;
+      border-radius: 100px;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: .06em;
+    }
+
+    .pill-blue   { background: rgba(59,130,246,.15); color: var(--blue);   border: 1px solid rgba(59,130,246,.3); }
+    .pill-purple { background: rgba(139,92,246,.15);  color: var(--purple); border: 1px solid rgba(139,92,246,.3); }
+    .pill-green  { background: rgba(34,197,94,.15);   color: var(--green);  border: 1px solid rgba(34,197,94,.3); }
+    .pill-red    { background: rgba(239,68,68,.15);   color: var(--red);    border: 1px solid rgba(239,68,68,.3); }
+    .pill-amber  { background: rgba(245,158,11,.15);  color: var(--amber);  border: 1px solid rgba(245,158,11,.3); }
+
+    /* ── Grids ────────────────────────────────────────────────── */
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr;           gap: 24px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3,1fr);     gap: 24px; }
+    .grid-4 { display: grid; grid-template-columns: repeat(4,1fr);     gap: 20px; }
+    .grid-9 { display: grid; grid-template-columns: repeat(3,1fr);     gap: 18px; }
+
+    @media (max-width: 900px) {
+      .grid-2, .grid-3, .grid-4, .grid-9 { grid-template-columns: 1fr; }
+      .slide { padding: 70px 6%; }
+    }
+
+    /* ── Divider ──────────────────────────────────────────────── */
+    .divider {
+      width: 60px; height: 3px;
+      background: linear-gradient(90deg, var(--blue), var(--purple));
+      border-radius: 2px;
+      margin: 20px 0 30px;
+    }
+
+    /* ── Slide 1 · Title ─────────────────────────────────────── */
+    #s1 {
+      background:
+        radial-gradient(ellipse 70% 60% at 80% 50%, rgba(59,130,246,.07) 0%, transparent 70%),
+        radial-gradient(ellipse 50% 60% at 20% 80%, rgba(139,92,246,.06) 0%, transparent 70%),
+        var(--bg);
+      text-align: center;
+      align-items: center;
+    }
+
+    #s1 .eyebrow {
+      display: flex; align-items: center; gap: 10px;
+      justify-content: center;
+      margin-bottom: 28px;
+    }
+
+    #s1 .dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 0 3px rgba(34,197,94,.2);
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%,100% { box-shadow: 0 0 0 3px rgba(34,197,94,.2); }
+      50%      { box-shadow: 0 0 0 7px rgba(34,197,94,.08); }
+    }
+
+    #s1 .subtitle {
+      font-size: clamp(1.1rem, 2.2vw, 1.6rem);
+      color: #94a3b8;
+      margin: 18px 0 32px;
+      font-weight: 300;
+    }
+
+    #s1 .quote {
+      max-width: 680px;
+      font-size: clamp(1rem, 1.6vw, 1.25rem);
+      color: #cbd5e1;
+      font-style: italic;
+      margin: 0 auto 40px;
+      padding: 24px 32px;
+      border-left: 3px solid var(--blue);
+      background: var(--surface);
+      border-radius: 0 12px 12px 0;
+      text-align: left;
+    }
+
+    #s1 .stack-pills {
+      display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;
+      margin-top: 8px;
+    }
+
+    /* ── Slide 2 · Problem ───────────────────────────────────── */
+    .stat-num {
+      font-size: clamp(2.4rem, 5vw, 3.8rem);
+      font-weight: 800;
+      letter-spacing: -.03em;
+      line-height: 1;
+      margin-bottom: 8px;
+    }
+
+    .problem-tags {
+      display: flex; flex-wrap: wrap; gap: 8px; margin-top: 28px;
+    }
+
+    /* ── Slide 3 · Today vs Tomorrow ─────────────────────────── */
+    .vs-col {
+      border-radius: 14px;
+      padding: 32px 28px;
+    }
+
+    .vs-col.today {
+      background: rgba(239,68,68,.05);
+      border: 1px solid rgba(239,68,68,.2);
+    }
+
+    .vs-col.atlas {
+      background: rgba(34,197,94,.05);
+      border: 1px solid rgba(34,197,94,.2);
+    }
+
+    .vs-step {
+      display: flex; align-items: flex-start; gap: 12px;
+      padding: 9px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: .9rem;
+      color: #94a3b8;
+    }
+
+    .vs-step:last-child { border-bottom: none; }
+
+    .vs-icon {
+      width: 22px; height: 22px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 700; flex-shrink: 0; margin-top: 1px;
+    }
+
+    .vs-time-badge {
+      display: inline-block;
+      font-size: clamp(1.6rem, 4vw, 3rem);
+      font-weight: 800;
+      letter-spacing: -.02em;
+      margin-top: 20px;
+    }
+
+    /* ── Slide 5 · Architecture diagram ──────────────────────── */
+    .arch-svg-wrap {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 36px 28px;
+      overflow-x: auto;
+    }
+
+    /* ── Slide 6 · Agents ────────────────────────────────────── */
+    .agent-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 22px 20px;
+      transition: border-color .2s;
+    }
+
+    .agent-icon {
+      width: 40px; height: 40px; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px; margin-bottom: 12px;
+    }
+
+    .agent-name { font-weight: 700; font-size: .95rem; margin-bottom: 6px; }
+    .agent-desc { font-size: .82rem; color: #64748b; line-height: 1.5; }
+
+    /* ── Slide 7 · MCP Tools ─────────────────────────────────── */
+    .mcp-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-top: 8px;
+    }
+
+    @media (max-width: 900px) { .mcp-grid { grid-template-columns: 1fr 1fr; } }
+
+    .mcp-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px 18px;
+      display: flex; align-items: center; gap: 14px;
+    }
+
+    .mcp-icon {
+      width: 38px; height: 38px; border-radius: 9px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 17px; flex-shrink: 0;
+    }
+
+    .mcp-label { font-weight: 600; font-size: .9rem; }
+    .mcp-sub   { font-size: .76rem; color: var(--muted); margin-top: 2px; }
+
+    /* ── Slide 8 · Demo timeline ─────────────────────────────── */
+    .timeline { position: relative; padding-left: 32px; }
+
+    .timeline::before {
+      content: '';
+      position: absolute; left: 7px; top: 12px; bottom: 12px;
+      width: 2px;
+      background: linear-gradient(180deg, var(--blue) 0%, var(--purple) 100%);
+      border-radius: 1px;
+    }
+
+    .tl-item {
+      position: relative;
+      padding: 14px 0 14px 22px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .tl-item:last-child { border-bottom: none; }
+
+    .tl-dot {
+      position: absolute;
+      left: -25px; top: 20px;
+      width: 14px; height: 14px; border-radius: 50%;
+      background: var(--surface);
+      border: 2px solid var(--blue);
+    }
+
+    .tl-time {
+      font-size: 11px; font-weight: 700;
+      letter-spacing: .1em;
+      color: var(--blue);
+      margin-bottom: 4px;
+    }
+
+    .tl-text { font-size: .93rem; color: #cbd5e1; }
+    .tl-text strong { color: #fff; }
+
+    /* ── Slide 9 · Learning loop ─────────────────────────────── */
+    .loop-steps {
+      display: flex; gap: 0; align-items: stretch;
+      margin: 32px 0;
+    }
+
+    .loop-step {
+      flex: 1;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 28px 20px;
+      text-align: center;
+      position: relative;
+    }
+
+    .loop-arrow {
+      display: flex; align-items: center; justify-content: center;
+      width: 36px; flex-shrink: 0;
+    }
+
+    .loop-num {
+      width: 36px; height: 36px; border-radius: 50%;
+      background: linear-gradient(135deg, var(--blue), var(--purple));
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 800; font-size: .9rem; margin: 0 auto 14px;
+    }
+
+    .metric-row {
+      display: flex; gap: 24px; flex-wrap: wrap; margin-top: 32px;
+    }
+
+    .metric-box {
+      flex: 1; min-width: 160px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 22px 20px;
+      text-align: center;
+    }
+
+    .metric-val {
+      font-size: clamp(1.6rem, 3.5vw, 2.6rem);
+      font-weight: 800;
+      letter-spacing: -.03em;
+      background: linear-gradient(135deg, var(--blue), var(--purple));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .metric-lbl { font-size: .82rem; color: var(--muted); margin-top: 4px; }
+
+    /* ── Slide 10 · Tech stack ───────────────────────────────── */
+    .stack-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px 20px; }
+    .stack-title { font-size: .72rem; font-weight: 700; letter-spacing: .15em; text-transform: uppercase; color: var(--muted); margin-bottom: 14px; }
+    .stack-item  { font-size: .88rem; color: #cbd5e1; padding: 5px 0; border-bottom: 1px solid var(--border); }
+    .stack-item:last-child { border-bottom: none; }
+
+    /* ── Slide 11 · Business ─────────────────────────────────── */
+    .tam-wrap {
+      display: flex; gap: 20px; align-items: flex-end; margin-bottom: 36px;
+    }
+
+    .tam-circle {
+      border-radius: 50%;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      text-align: center; flex-shrink: 0;
+    }
+
+    .tam-label { font-size: .7rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+    .tam-val   { font-weight: 800; line-height: 1.1; }
+
+    /* ── Slide 12 · CTA ──────────────────────────────────────── */
+    #s12 {
+      background:
+        radial-gradient(ellipse 80% 70% at 50% 50%, rgba(59,130,246,.06) 0%, transparent 70%),
+        radial-gradient(ellipse 40% 40% at 20% 20%, rgba(139,92,246,.05) 0%, transparent 60%),
+        var(--bg);
+      text-align: center;
+      align-items: center;
+    }
+
+    #s12 .big-quote {
+      font-size: clamp(1.4rem, 3vw, 2.2rem);
+      font-weight: 700;
+      color: #e2e8f0;
+      margin: 32px 0 40px;
+      font-style: italic;
+    }
+
+    #s12 .benefit-row {
+      display: flex; gap: 16px; flex-wrap: wrap; justify-content: center;
+      margin-bottom: 48px;
+    }
+
+    #s12 .benefit {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 100px;
+      padding: 10px 22px;
+      font-size: .9rem;
+      color: #cbd5e1;
+      display: flex; align-items: center; gap: 8px;
+    }
+
+    #s12 .benefit-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); }
+
+    #s12 .footer-line {
+      font-size: .8rem;
+      color: var(--muted);
+      margin-top: 8px;
+    }
+
+    #s12 .footer-line a { color: var(--blue); text-decoration: none; }
+
+    /* ── Utility ─────────────────────────────────────────────── */
+    .mt-8  { margin-top:  8px; }
+    .mt-16 { margin-top: 16px; }
+    .mt-24 { margin-top: 24px; }
+    .mt-32 { margin-top: 32px; }
+    .mt-40 { margin-top: 40px; }
+    .mb-8  { margin-bottom:  8px; }
+
+    .text-center { text-align: center; }
+    .flex-center { display:flex; align-items:center; justify-content:center; }
+  </style>
+</head>
+<body>
+
+<div class="progress-bar"></div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     SLIDE 1 · TITLE
+════════════════════════════════════════════════════════════ -->
+<section class="slide" id="s1">
+  <div class="slide-number"><span>01</span> / 12</div>
+
+  <div class="eyebrow">
+    <div class="dot"></div>
+    <span style="font-size:.8rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:#64748b;">OpenAI Hackathon 2025</span>
+  </div>
+
+  <h1>Atlas <span class="gradient-text">AI</span></h1>
+  <p class="subtitle">The Autonomous Enterprise Engineer</p>
+
+  <div class="quote">
+    "From production incident to root cause and fix — without human intervention."
+  </div>
+
+  <div class="stack-pills">
+    <span class="pill pill-blue">⚡ Powered by GPT-5.6</span>
+    <span class="pill pill-purple">🤖 Multi-Agent Orchestration</span>
+    <span class="pill pill-green">🔧 MCP Tool Use</span>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════
+     SLIDE 2 · THE PROBLEM
+════════════════════════════════════════════════════════════ -->
+<section class="slide" id="s2">
+  <div class="slide-number"><span>02</span> / 12</div>
+  <div class="label">The Problem</div>
+  <h2>87% of engineering time is lost<br>to reactive firefighting</h2>
+  <div class="divider"></div>
+
+  <div class="grid-3 mt-32">
+    <div class="card card-accent-red">
+      <div class="stat-num" style="color:var(--red);">2–8 hrs</div>
+      <h3 style="margin-bottom:8px;">Mean Time to Resolve</h3>
+      <p>Average time engineers spend resolving a single production incident from alert to close.</p>
+    </div>
+    <div class="card card-accent-amber">
+      <div class="stat-num" style="color:var(--amber);">$500K+</div>
+      <h3 style="margin-bottom:8px;">Cost Per Hour Downtime</h3>
+      <p>Average financial impact for enterprise-grade systems experiencing a P1 production outage.</p>
+    </div>
+    <div class="card card-accent-purple">
+      <div class="stat-num" style="color:var(--purple);">47%</div>
+      <h3 style="margin-bottom:8px;">Time Spent on Incidents</h3>
+      <p>Nearly half of every engineer's working week is consumed by incidents instead of new features.</p>
+    </div>
+  </div>
+
+  <div class="problem-tags">
+    <span class="pill pill-blue">Slack</span>
+    <span class="pill pill-blue">GitHub</span>
+    <span class="pill pill-blue">Jira</span>
+    <span class="pill pill-blue">Confluence</span>
+    <span class="pill pill-blue">Grafana</span>
+    <span class="pill pill-blue">Kubernetes</span>
+    <span class="pill pill-blue">AWS</span>
+    <span style="font-size:.85rem;color:var(--muted);align-self:center;margin-left:8px;">Knowledge fragmented across every tool</span>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════
+     SLIDE 3 · TODAY vs TOMORROW
+════════════════════════════════════════════════════════════ -->
+<section class="slide" id="s3">
+  <div class="slide-number"><span>03</span> / 12</div>
+  <div class="label">Today vs Tomorrow</div>
+  <h2>The incident workflow, reimagined</h2>
+  <div class="divider"></div>
+
+  <div class="grid-2 mt-32">
+    <!-- TODAY -->
+    <div class="vs-col today">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;">
+        <span class="pill pill-red">TODAY</span>
+        <span style="font-size:.85rem;color:var(--muted);">Manual workflow</span>
+      </div>
+      <div class="vs-step">
+        <div class="vs-icon" style="background:rgba(239,68,68,.15);color:var(--red);">1</div>
+        <span>Incident fires in production</span>
+      </div>
+      <div class="vs-step">
+        <div class="vs-icon" style="background:rgba(239,68,68,.15);color:var(--red);">2</div>
+        <span>Engineer alerted at 2 AM</span>
+      </div>
+      <div class="vs-step">
+        <div class="vs-icon" style="background:rgba(239,68,68,.15);color:var(--red);">3</div>
+        <span>Search docs &amp; runbooks</span>
+      </div>
+      <div class="vs-step">
+        <div class="vs-icon" style="background:rgba(239,68,68,.15);color:var(--red);">4</div>
+        <span>Run kubectl commands manually</span>
+      </div>
+      <div class="vs-step">
+        <div class="vs-icon" style="background:rgba(239,68,68,.15);color:var(--red);">5</div>
+        <span>Check pod logs, events, PVCs</span>
+      </div>
+      <div class="vs-step">
+        <div class="vs-icon" style="background:rgba(239,68,68,.15);color:var(--red);">6</div>
+        <span>Query Prometheus dashboards</span>
+      </div>
+      <div class="vs-step">
+        <div class="vs-icon" style="background:rgba(239,68,68,.15);color:var(--red);">7</div>
+        <span>Ask colleagues in Slack</span>
+      </div>
+      <div class="vs-step">
+        <div class="vs-icon" style="background:rgba(239,68,68,.15);color:var(--red);">8</div>
+        <span>Find the relevant GitHub issue</span>
+      </div>
+      <div class="vs-step">
+        <div class="vs-icon" style="background:rgba(239,68,68,.15);color:var(--red);">9</div>
+        <span>Write &amp; review the fix</span>
+      </div>
+      <div class="vs-step">
+        <div class="vs-icon" style="background:rgba(239,68,68,.15);color:var(--red);">10</div>
+        <span>Deploy &amp; validate</span>
+      </div>
+      <div class="vs-step">
+        <div class="vs-icon" style="background:rgba(239,68,68,.15);color:var(--red);">11</div>
+        <span>Write the post-incident report</span>
+      </div>
+      <div class="vs-time-badge" style="color:var(--red);">2–8 HOURS</div>
+    </div>
+
+    <!-- ATLAS AI -->
+    <div class="vs-col atlas">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;">
+        <span class="pill pill-green">ATLAS AI</span>
+        <span style="font-size:.85rem;color:var(--muted);">Autonomous workflow</span>
+      </div>
+      <div class="vs-step">
+        <div class="vs-icon" style="background:rgba(34,197,94,.15);color:var(--green);">1</div>
+        <span>Incident fires in production</span>
+      </div>
+      <div class="vs-step">
+        <div class="vs-icon" style="background:rgba(34,197,94,.15);color:var(--green);">2</div>
+        <span>Atlas AI is already on it</span>
+      </div>
+      <div class="vs-step">
+        <div class="vs-icon" style="background:rgba(34,197,94,.15);color:var(--green);">3</div>
+        <span style="color:#22c55e;font-weight:600;">✓ Resolved. Report sent. Ticket filed.</span>
+      </div>
+      <div style="margin-top:24px;padding:20px;background:rgba(34,197,94,.06);border:1px solid rgba(34,197,94,.15);border-radius:10px;">
+        <p style="color:#86efac;font-size:.9rem;line-height:1.7;">
+          While your engineers sleep, Atlas AI has already diagnosed the root cause,
+          applied the approved fix, validated pod health, sent a Slack summary,
+          filed a Jira ticket, and generated the full RCA report.
+        </p>
+      </div>
+      <div class="vs-time-badge" style="color:var(--green);">5 MINUTES</div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════
+     SLIDE 4 · SOLUTION
+════════════════════════════════════════════════════════════ -->
+<section class="slide" id="s4">
+  <div class="slide-number"><span>04</span> / 12</div>
+  <div class="label">Solution</div>
+  <h2>Atlas AI is an AI employee<br>that autonomously engineers</h2>
+  <div class="divider"></div>
+
+  <div class="grid-2 mt-32" style="gap:32px;">
+    <div>
+      <div style="display:flex;flex-direction:column;gap:14px;">
+        <div style="display:flex;align-items:flex-start;gap:16px;padding:16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;">
+          <span style="font-size:1.5rem;flex-shrink:0;">🔍</span>
+          <div>
+            <div style="font-weight:600;margin-bottom:4px;">Detects &amp; Investigates</div>
+            <p style="font-size:.85rem;">Continuously monitors production systems. Triggers investigations on anomalies before humans are paged.</p>
+          </div>
+        </div>
+        <div style="display:flex;align-items:flex-start;gap:16px;padding:16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;">
+          <span style="font-size:1.5rem;flex-shrink:0;">⚙️</span>
+          <div>
+            <div style="font-weight:600;margin-bottom:4px;">Runs Real Tools</div>
+            <p style="font-size:.85rem;">Executes <code style="color:var(--blue);background:rgba(59,130,246,.1);padding:1px 5px;border-radius:4px;">kubectl</code>, queries Prometheus, searches GitHub, reads runbooks — the same tools your engineers use.</p>
+          </div>
+        </div>
+        <div style="display:flex;align-items:flex-start;gap:16px;padding:16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;">
+          <span style="font-size:1.5rem;flex-shrink:0;">🧠</span>
+          <div>
+            <div style="font-weight:600;margin-bottom:4px;">Identifies Root Cause</div>
+            <p style="font-size:.85rem;">Cross-references signals across all systems to produce evidence-backed root cause with full audit trail.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div style="display:flex;flex-direction:column;gap:14px;">
+        <div style="display:flex;align-items:flex-start;gap:16px;padding:16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;">
+          <span style="font-size:1.5rem;flex-shrink:0;">🚀</span>
+          <div>
+            <div style="font-weight:600;margin-bottom:4px;">Applies Approved Fixes</div>
+            <p style="font-size:.85rem;">Executes approved remediation playbooks. Human-in-the-loop escalation for novel situations.</p>
+          </div>
+        </div>
+        <div style="display:flex;align-items:flex-start;gap:16px;padding:16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;">
+          <span style="font-size:1.5rem;flex-shrink:0;">📄</span>
+          <div>
+            <div style="font-weight:600;margin-bottom:4px;">Generates Everything</div>
+            <p style="font-size:.85rem;">Auto-creates RCA reports, Slack summaries, Jira tickets, and GitHub issue links — zero manual docs.</p>
+          </div>
+        </div>
+        <div style="display:flex;align-items:flex-start;gap:16px;padding:16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;">
+          <span style="font-size:1.5rem;flex-shrink:0;">📈</span>
+          <div>
+            <div style="font-weight:600;margin-bottom:4px;">Learns &amp; Improves</div>
+            <p style="font-size:.85rem;">Every resolved incident becomes a training case. Atlas AI's accuracy improves with every resolution.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════
+     SLIDE 5 · ARCHITECTURE
+════════════════════════════════════════════════════════════ -->
+<section class="slide" id="s5">
+  <div class="slide-number"><span>05</span> / 12</div>
+  <div class="label">Architecture</div>
+  <h2>Multi-Agent Architecture</h2>
+  <div class="divider"></div>
+
+  <div class="arch-svg-wrap mt-32">
+    <svg viewBox="0 0 900 400" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-height:400px;display:block;">
+      <defs>
+        <marker id="arr" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L8,3 z" fill="#3b82f6"/>
+        </marker>
+        <marker id="arr2" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L8,3 z" fill="#8b5cf6"/>
+        </marker>
+        <linearGradient id="blueGrad" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stop-color="#3b82f6"/>
+          <stop offset="100%" stop-color="#8b5cf6"/>
+        </linearGradient>
+      </defs>
+
+      <!-- User -->
+      <rect x="20" y="165" width="100" height="70" rx="10" fill="#12121a" stroke="#3b82f6" stroke-width="1.5"/>
+      <text x="70" y="197" text-anchor="middle" fill="#e2e8f0" font-size="12" font-family="system-ui" font-weight="600">User /</text>
+      <text x="70" y="213" text-anchor="middle" fill="#e2e8f0" font-size="12" font-family="system-ui" font-weight="600">Alert</text>
+
+      <!-- Arrow 1 -->
+      <line x1="122" y1="200" x2="165" y2="200" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#arr)"/>
+
+      <!-- GPT Work Agent -->
+      <rect x="168" y="148" width="120" height="104" rx="10" fill="#12121a" stroke="url(#blueGrad)" stroke-width="2"/>
+      <text x="228" y="188" text-anchor="middle" fill="#3b82f6" font-size="11" font-family="system-ui" font-weight="700">GPT-5.6</text>
+      <text x="228" y="204" text-anchor="middle" fill="#e2e8f0" font-size="11" font-family="system-ui" font-weight="600">Work Agent</text>
+      <rect x="186" y="216" width="84" height="24" rx="5" fill="rgba(59,130,246,.12)"/>
+      <text x="228" y="232" text-anchor="middle" fill="#94a3b8" font-size="9.5" font-family="system-ui">Orchestrator</text>
+
+      <!-- Arrow 2 -->
+      <line x1="290" y1="200" x2="333" y2="200" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#arr)"/>
+
+      <!-- Sub-agents box -->
+      <rect x="336" y="110" width="180" height="180" rx="12" fill="#12121a" stroke="#1e1e2e" stroke-width="1.5"/>
+      <text x="426" y="138" text-anchor="middle" fill="#64748b" font-size="10" font-family="system-ui" font-weight="600" letter-spacing="1">SUB-AGENTS</text>
+
+      <rect x="352" y="148" width="148" height="30" rx="6" fill="rgba(59,130,246,.1)" stroke="rgba(59,130,246,.2)" stroke-width="1"/>
+      <text x="426" y="167" text-anchor="middle" fill="#93c5fd" font-size="11" font-family="system-ui">Planning Agent</text>
+
+      <rect x="352" y="186" width="148" height="30" rx="6" fill="rgba(139,92,246,.1)" stroke="rgba(139,92,246,.2)" stroke-width="1"/>
+      <text x="426" y="205" text-anchor="middle" fill="#c4b5fd" font-size="11" font-family="system-ui">Research Agents (×7)</text>
+
+      <rect x="352" y="224" width="148" height="30" rx="6" fill="rgba(34,197,94,.1)" stroke="rgba(34,197,94,.2)" stroke-width="1"/>
+      <text x="426" y="243" text-anchor="middle" fill="#86efac" font-size="11" font-family="system-ui">Execution Agent</text>
+
+      <!-- Arrow 3 -->
+      <line x1="518" y1="200" x2="558" y2="200" stroke="#8b5cf6" stroke-width="1.5" marker-end="url(#arr2)"/>
+
+      <!-- MCP Tools box -->
+      <rect x="560" y="90" width="160" height="220" rx="12" fill="#12121a" stroke="#1e1e2e" stroke-width="1.5"/>
+      <text x="640" y="116" text-anchor="middle" fill="#64748b" font-size="10" font-family="system-ui" font-weight="600" letter-spacing="1">MCP TOOLS</text>
+
+      <text x="576" y="142" fill="#94a3b8" font-size="10.5" font-family="system-ui">⎈ Kubernetes</text>
+      <text x="576" y="163" fill="#94a3b8" font-size="10.5" font-family="system-ui">󰊤 GitHub</text>
+      <text x="576" y="184" fill="#94a3b8" font-size="10.5" font-family="system-ui">🎫 Jira</text>
+      <text x="576" y="205" fill="#94a3b8" font-size="10.5" font-family="system-ui">💬 Slack</text>
+      <text x="576" y="226" fill="#94a3b8" font-size="10.5" font-family="system-ui">📊 Prometheus</text>
+      <text x="576" y="247" fill="#94a3b8" font-size="10.5" font-family="system-ui">📚 Confluence</text>
+      <text x="576" y="268" fill="#94a3b8" font-size="10.5" font-family="system-ui">🖥️ Filesystem</text>
+      <text x="576" y="289" fill="#94a3b8" font-size="10.5" font-family="system-ui">🌐 Browser</text>
+
+      <!-- Arrow 4 -->
+      <line x1="722" y1="200" x2="762" y2="200" stroke="#8b5cf6" stroke-width="1.5" marker-end="url(#arr2)"/>
+
+      <!-- Codex Runtime -->
+      <rect x="764" y="148" width="118" height="104" rx="10" fill="#12121a" stroke="#8b5cf6" stroke-width="2"/>
+      <text x="823" y="188" text-anchor="middle" fill="#8b5cf6" font-size="11" font-family="system-ui" font-weight="700">Codex</text>
+      <text x="823" y="204" text-anchor="middle" fill="#e2e8f0" font-size="11" font-family="system-ui" font-weight="600">Runtime</text>
+      <text x="823" y="226" text-anchor="middle" fill="#64748b" font-size="10" font-family="system-ui">Terminal +</text>
+      <text x="823" y="240" text-anchor="middle" fill="#64748b" font-size="10" font-family="system-ui">Computer Use</text>
+
+      <!-- Layer labels -->
+      <text x="228" y="375" text-anchor="middle" fill="#3b82f6" font-size="9" font-family="system-ui" font-weight="600">INTELLIGENCE LAYER</text>
+      <text x="426" y="375" text-anchor="middle" fill="#8b5cf6" font-size="9" font-family="system-ui" font-weight="600">AGENT LAYER</text>
+      <text x="640" y="375" text-anchor="middle" fill="#64748b" font-size="9" font-family="system-ui" font-weight="600">INTEGRATION LAYER</text>
+      <text x="823" y="375" text-anchor="middle" fill="#8b5cf6" font-size="9" font-family="system-ui" font-weight="600">EXECUTION LAYER</text>
+    </svg>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════
+     SLIDE 6 · THE 9 AGENTS
+════════════════════════════════════════════════════════════ -->
+<section class="slide" id="s6">
+  <div class="slide-number"><span>06</span> / 12</div>
+  <div class="label">Agent Fleet</div>
+  <h2>The 9 Specialist Agents</h2>
+  <div class="divider"></div>
+
+  <div class="grid-9 mt-32">
+    <div class="agent-card">
+      <div class="agent-icon" style="background:rgba(59,130,246,.12);">🧩</div>
+      <div class="agent-name">Planning Agent</div>
+      <div class="agent-desc">Decomposes incidents into parallel investigation tasks and coordinates the agent fleet.</div>
+    </div>
+    <div class="agent-card">
+      <div class="agent-icon" style="background:rgba(34,197,94,.12);">⎈</div>
+      <div class="agent-name">Kubernetes Agent</div>
+      <div class="agent-desc">kubectl, pod logs, events, PVCs, node status, resource quotas, HPA.</div>
+    </div>
+    <div class="agent-card">
+      <div class="agent-icon" style="background:rgba(245,158,11,.12);">💾</div>
+      <div class="agent-name">Storage Agent</div>
+      <div class="agent-desc">Ceph, CSI drivers, NFS mounts, PVC bindings, disk I/O analysis.</div>
+    </div>
+    <div class="agent-card">
+      <div class="agent-icon" style="background:rgba(139,92,246,.12);">🌐</div>
+      <div class="agent-name">Network Agent</div>
+      <div class="agent-desc">DNS resolution, Services, Ingress rules, NetworkPolicy, connectivity tests.</div>
+    </div>
+    <div class="agent-card">
+      <div class="agent-icon" style="background:rgba(59,130,246,.12);">🐙</div>
+      <div class="agent-name">GitHub Agent</div>
+      <div class="agent-desc">PRs, issues, commits, blame, code search, CI/CD pipeline status.</div>
+    </div>
+    <div class="agent-card">
+      <div class="agent-icon" style="background:rgba(239,68,68,.12);">🔐</div>
+      <div class="agent-name">Security Agent</div>
+      <div class="agent-desc">RBAC policies, CVE scanning, secrets hygiene, PodSecurityPolicy audits.</div>
+    </div>
+    <div class="agent-card">
+      <div class="agent-icon" style="background:rgba(34,197,94,.12);">📚</div>
+      <div class="agent-name">Documentation Agent</div>
+      <div class="agent-desc">RAG search across runbooks, Confluence, internal wikis, past incident reports.</div>
+    </div>
+    <div class="agent-card">
+      <div class="agent-icon" style="background:rgba(245,158,11,.12);">💰</div>
+      <div class="agent-name">Cost Agent</div>
+      <div class="agent-desc">CPU/GPU waste detection, idle node identification, rightsizing recommendations.</div>
+    </div>
+    <div class="agent-card" style="border-color:rgba(139,92,246,.3);">
+      <div class="agent-icon" style="background:rgba(139,92,246,.12);">📋</div>
+      <div class="agent-name">RCA Agent</div>
+      <div class="agent-desc">Synthesizes all findings into a structured, executive-ready root cause analysis report.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════
+     SLIDE 7 · MCP TOOLS
+════════════════════════════════════════════════════════════ -->
+<section class="slide" id="s7">
+  <div class="slide-number"><span>07</span> / 12</div>
+  <div class="label">Model Context Protocol</div>
+  <h2>Every System Becomes a Tool</h2>
+  <div class="divider"></div>
+  <p class="mt-8" style="max-width:600px;">Atlas AI discovers and uses tools dynamically through the Model Context Protocol — the same open standard powering the next generation of AI agents.</p>
+
+  <div class="mcp-grid mt-32">
+    <div class="mcp-card">
+      <div class="mcp-icon" style="background:rgba(59,130,246,.12);">🐙</div>
+      <div>
+        <div class="mcp-label">GitHub MCP</div>
+        <div class="mcp-sub">PRs · Issues · Code Search</div>
+      </div>
+    </div>
+    <div class="mcp-card">
+      <div class="mcp-icon" style="background:rgba(34,197,94,.12);">⎈</div>
+      <div>
+        <div class="mcp-label">Kubernetes MCP</div>
+        <div class="mcp-sub">kubectl · Events · Logs</div>
+      </div>
+    </div>
+    <div class="mcp-card">
+      <div class="mcp-icon" style="background:rgba(245,158,11,.12);">📊</div>
+      <div>
+        <div class="mcp-label">Prometheus MCP</div>
+        <div class="mcp-sub">PromQL · Alerts · Metrics</div>
+      </div>
+    </div>
+    <div class="mcp-card">
+      <div class="mcp-icon" style="background:rgba(59,130,246,.12);">🎫</div>
+      <div>
+        <div class="mcp-label">Jira MCP</div>
+        <div class="mcp-sub">Tickets · Sprints · Epics</div>
+      </div>
+    </div>
+    <div class="mcp-card">
+      <div class="mcp-icon" style="background:rgba(139,92,246,.12);">💬</div>
+      <div>
+        <div class="mcp-label">Slack MCP</div>
+        <div class="mcp-sub">Channels · Threads · DMs</div>
+      </div>
+    </div>
+    <div class="mcp-card">
+      <div class="mcp-icon" style="background:rgba(34,197,94,.12);">📚</div>
+      <div>
+        <div class="mcp-label">Confluence MCP</div>
+        <div class="mcp-sub">Pages · Spaces · Runbooks</div>
+      </div>
+    </div>
+    <div class="mcp-card">
+      <div class="mcp-icon" style="background:rgba(245,158,11,.12);">🌐</div>
+      <div>
+        <div class="mcp-label">Browser MCP</div>
+        <div class="mcp-sub">Dashboards · Docs · Web</div>
+      </div>
+    </div>
+    <div class="mcp-card">
+      <div class="mcp-icon" style="background:rgba(239,68,68,.12);">📁</div>
+      <div>
+        <div class="mcp-label">Filesystem MCP</div>
+        <div class="mcp-sub">Config · Secrets · Logs</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="mt-32" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:24px 28px;display:flex;align-items:center;gap:20px;">
+    <div style="width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,var(--blue),var(--purple));display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">🔌</div>
+    <div>
+      <div style="font-weight:600;margin-bottom:4px;">Extensible by design</div>
+      <p style="font-size:.88rem;">Any system that exposes an MCP server can be immediately used by Atlas AI — no custom integrations, no code changes. Plug in and go.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════
+     SLIDE 8 · LIVE DEMO
+════════════════════════════════════════════════════════════ -->
+<section class="slide" id="s8">
+  <div class="slide-number"><span>08</span> / 12</div>
+  <div class="label">Live Demo</div>
+  <h2>Watch Atlas AI Resolve an Outage</h2>
+  <div class="divider"></div>
+
+  <div class="grid-2 mt-32" style="align-items:start;gap:48px;">
+    <div class="timeline">
+      <div class="tl-item">
+        <div class="tl-dot" style="border-color:var(--red);background:rgba(239,68,68,.2);"></div>
+        <div class="tl-time">00:00</div>
+        <div class="tl-text"><strong>Production deployment fails.</strong> Pods crash. Dashboard goes red. PagerDuty fires.</div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-dot"></div>
+        <div class="tl-time">00:15</div>
+        <div class="tl-text"><strong>Atlas AI detects CrashLoopBackOff.</strong> Planning Agent spawns investigation tasks.</div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-dot"></div>
+        <div class="tl-time">00:30</div>
+        <div class="tl-text"><strong>Kubernetes Agent:</strong> found pod logs showing <code style="color:var(--red);background:rgba(239,68,68,.1);padding:1px 6px;border-radius:4px;">missing SECRET_KEY env var</code></div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-dot"></div>
+        <div class="tl-time">01:00</div>
+        <div class="tl-text"><strong>GitHub Agent:</strong> secret was removed in <span style="color:var(--blue);">PR #847</span> — 6 hours ago by @devuser</div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-dot"></div>
+        <div class="tl-time">01:30</div>
+        <div class="tl-text"><strong>Security Agent:</strong> confirmed RBAC allows secret creation in production namespace</div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-dot" style="border-color:var(--amber);"></div>
+        <div class="tl-time">02:00</div>
+        <div class="tl-text"><strong>Execution Agent:</strong> creates missing secret, triggers rolling restart of deployment</div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-dot" style="border-color:var(--green);"></div>
+        <div class="tl-time">03:00</div>
+        <div class="tl-text"><strong style="color:var(--green);">Validation passed.</strong> All pods healthy. Endpoints responding. Error rate → 0%.</div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-dot" style="border-color:var(--purple);background:rgba(139,92,246,.2);"></div>
+        <div class="tl-time">04:00</div>
+        <div class="tl-text"><strong>RCA Report generated.</strong> Slack message sent. Jira ticket created. GitHub issue linked.</div>
+      </div>
+    </div>
+
+    <div>
+      <div style="background:#0d1117;border:1px solid #30363d;border-radius:12px;padding:28px;font-family:'Courier New',monospace;font-size:.82rem;line-height:1.9;">
+        <div style="color:#8b949e;margin-bottom:16px;">▶ atlas-ai run --watch production</div>
+        <div><span style="color:#3b82f6;">[00:15]</span> <span style="color:#f0f6fc;">Incident detected: CrashLoopBackOff</span></div>
+        <div><span style="color:#3b82f6;">[00:15]</span> <span style="color:#8b949e;">Spawning 4 investigation agents...</span></div>
+        <div><span style="color:#3b82f6;">[00:22]</span> <span style="color:#f0f6fc;">kubectl logs api-pod-7f9d4 --tail=50</span></div>
+        <div><span style="color:#ef4444;">[00:23]</span> <span style="color:#ef4444;">Error: SECRET_KEY not found in env</span></div>
+        <div><span style="color:#3b82f6;">[00:31]</span> <span style="color:#f0f6fc;">github.search_commits("SECRET_KEY")</span></div>
+        <div><span style="color:#f59e0b;">[00:58]</span> <span style="color:#f0f6fc;">Found: PR#847 removed secret ref</span></div>
+        <div><span style="color:#3b82f6;">[01:32]</span> <span style="color:#f0f6fc;">RBAC check: secret/create → ALLOWED</span></div>
+        <div><span style="color:#3b82f6;">[02:01]</span> <span style="color:#f0f6fc;">kubectl create secret generic api-key...</span></div>
+        <div><span style="color:#3b82f6;">[02:04]</span> <span style="color:#f0f6fc;">kubectl rollout restart deploy/api</span></div>
+        <div><span style="color:#22c55e;">[03:02]</span> <span style="color:#22c55e;">✓ All pods Running (3/3)</span></div>
+        <div><span style="color:#22c55e;">[03:05]</span> <span style="color:#22c55e;">✓ Health check: 200 OK</span></div>
+        <div><span style="color:#8b5cf6;">[04:01]</span> <span style="color:#c4b5fd;">RCA report → Confluence</span></div>
+        <div><span style="color:#8b5cf6;">[04:02]</span> <span style="color:#c4b5fd;">Slack #incidents → notified</span></div>
+        <div><span style="color:#8b5cf6;">[04:03]</span> <span style="color:#c4b5fd;">Jira INC-2847 → created</span></div>
+        <div style="margin-top:16px;color:#22c55e;font-weight:bold;">✓ Resolved in 4m 28s</div>
+      </div>
+
+      <div class="mt-24" style="background:rgba(34,197,94,.06);border:1px solid rgba(34,197,94,.2);border-radius:10px;padding:20px 24px;text-align:center;">
+        <div style="font-size:2rem;font-weight:800;color:var(--green);">4.5 min</div>
+        <div style="font-size:.82rem;color:#86efac;margin-top:4px;">What used to take <strong>3 hours</strong></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════
+     SLIDE 9 · LEARNING LOOP
+════════════════════════════════════════════════════════════ -->
+<section class="slide" id="s9">
+  <div class="slide-number"><span>09</span> / 12</div>
+  <div class="label">Continuous Learning</div>
+  <h2>Atlas AI Gets Smarter Over Time</h2>
+  <div class="divider"></div>
+
+  <div class="loop-steps mt-32">
+    <div class="loop-step">
+      <div class="loop-num">1</div>
+      <h3 style="margin-bottom:8px;">Every Incident</h3>
+      <p style="font-size:.85rem;">Atlas AI autonomously investigates, diagnoses, and resolves production incidents across all integrated systems.</p>
+    </div>
+    <div class="loop-arrow">
+      <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M8 18 H28 M22 12 L28 18 L22 24" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    <div class="loop-step">
+      <div class="loop-num">2</div>
+      <h3 style="margin-bottom:8px;">Human Approves</h3>
+      <p style="font-size:.85rem;">Engineers review and approve or adjust the resolution. Atlas AI learns from every correction and confirmation.</p>
+    </div>
+    <div class="loop-arrow">
+      <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M8 18 H28 M22 12 L28 18 L22 24" stroke="#8b5cf6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    <div class="loop-step" style="border-color:rgba(139,92,246,.3);">
+      <div class="loop-num">3</div>
+      <h3 style="margin-bottom:8px;">Embedded as Training</h3>
+      <p style="font-size:.85rem;">Verified resolutions become embedded training cases, improving accuracy on future incidents of the same class.</p>
+    </div>
+    <div class="loop-arrow">
+      <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M28 18 Q18 6 8 18" stroke="#22c55e" stroke-width="2" fill="none" stroke-linecap="round" marker-end="url(#arrGreen)"/>
+      </svg>
+    </div>
+  </div>
+
+  <div class="metric-row">
+    <div class="metric-box">
+      <div class="metric-val">23%</div>
+      <div class="metric-lbl">Resolution time improvement per month</div>
+    </div>
+    <div class="metric-box">
+      <div class="metric-val">94%</div>
+      <div class="metric-lbl">Accuracy on known incident patterns</div>
+    </div>
+    <div class="metric-box">
+      <div class="metric-val">0</div>
+      <div class="metric-lbl">False positive fixes ever applied</div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════
+     SLIDE 10 · TECHNOLOGY STACK
+════════════════════════════════════════════════════════════ -->
+<section class="slide" id="s10">
+  <div class="slide-number"><span>10</span> / 12</div>
+  <div class="label">Technology</div>
+  <h2>Built on a Production-Grade Stack</h2>
+  <div class="divider"></div>
+
+  <div class="grid-4 mt-32">
+    <div class="stack-card card-accent-blue">
+      <div class="stack-title">Frontend</div>
+      <div class="stack-item">Next.js 14</div>
+      <div class="stack-item">React</div>
+      <div class="stack-item">Tailwind CSS</div>
+      <div class="stack-item">shadcn/ui</div>
+      <div class="stack-item">WebSockets</div>
+    </div>
+    <div class="stack-card card-accent-green">
+      <div class="stack-title">Backend</div>
+      <div class="stack-item">FastAPI</div>
+      <div class="stack-item">Python 3.12</div>
+      <div class="stack-item">AsyncIO</div>
+      <div class="stack-item">OpenAI SDK</div>
+    </div>
+    <div class="stack-card card-accent-purple">
+      <div class="stack-title">AI / Agents</div>
+      <div class="stack-item">GPT-5.6 Work</div>
+      <div class="stack-item">GPT-5.6 Sol</div>
+      <div class="stack-item">OpenAI Codex</div>
+      <div class="stack-item">MCP Protocol</div>
+    </div>
+    <div class="stack-card card-accent-amber">
+      <div class="stack-title">Infrastructure</div>
+      <div class="stack-item">Kubernetes</div>
+      <div class="stack-item">PostgreSQL</div>
+      <div class="stack-item">Redis Streams</div>
+      <div class="stack-item">Prometheus</div>
+      <div class="stack-item">Grafana</div>
+      <div class="stack-item">OpenTelemetry</div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════
+     SLIDE 11 · BUSINESS MODEL
+════════════════════════════════════════════════════════════ -->
+<section class="slide" id="s11">
+  <div class="slide-number"><span>11</span> / 12</div>
+  <div class="label">Market Opportunity</div>
+  <h2>The AI Employee Market</h2>
+  <div class="divider"></div>
+
+  <div class="grid-2 mt-32" style="gap:48px;align-items:center;">
+    <div>
+      <!-- TAM/SAM/SOM visual -->
+      <div style="position:relative;display:flex;flex-direction:column;gap:14px;">
+        <div style="background:rgba(59,130,246,.06);border:1px solid rgba(59,130,246,.2);border-radius:12px;padding:22px 24px;display:flex;align-items:center;justify-content:space-between;">
+          <div>
+            <div style="font-size:.7rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:4px;">TAM</div>
+            <div style="font-size:1.1rem;font-weight:600;">IT Operations Management</div>
+          </div>
+          <div style="font-size:2.2rem;font-weight:800;color:var(--blue);">$47B</div>
+        </div>
+        <div style="background:rgba(139,92,246,.06);border:1px solid rgba(139,92,246,.2);border-radius:12px;padding:22px 24px;display:flex;align-items:center;justify-content:space-between;margin-left:24px;">
+          <div>
+            <div style="font-size:.7rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:4px;">SAM</div>
+            <div style="font-size:1.1rem;font-weight:600;">AIOps &amp; Intelligent Automation</div>
+          </div>
+          <div style="font-size:2.2rem;font-weight:800;color:var(--purple);">$8.2B</div>
+        </div>
+        <div style="background:rgba(34,197,94,.06);border:1px solid rgba(34,197,94,.2);border-radius:12px;padding:22px 24px;display:flex;align-items:center;justify-content:space-between;margin-left:48px;">
+          <div>
+            <div style="font-size:.7rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:4px;">SOM</div>
+            <div style="font-size:1.1rem;font-weight:600;">Enterprise K8s / Cloud Ops</div>
+          </div>
+          <div style="font-size:2.2rem;font-weight:800;color:var(--green);">$380M</div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="card card-accent-blue" style="margin-bottom:20px;">
+        <h3 style="margin-bottom:12px;">💳 Pricing</h3>
+        <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:8px;">
+          <span style="font-size:2rem;font-weight:800;color:var(--blue);">$2K–$8K</span>
+          <span style="color:var(--muted);font-size:.9rem;">/ month per engineering team</span>
+        </div>
+        <p style="font-size:.85rem;">Scales with team size, integration count, and incident volume. Annual contracts with usage-based tiers.</p>
+      </div>
+
+      <div style="background:rgba(34,197,94,.06);border:1px solid rgba(34,197,94,.25);border-radius:12px;padding:22px 24px;">
+        <div style="font-size:1.05rem;font-weight:700;color:#86efac;margin-bottom:8px;">💡 The ROI Pitch</div>
+        <p style="font-size:.92rem;color:#cbd5e1;line-height:1.7;">
+          One prevented P1 incident at $500K/hr saves a company <strong style="color:#fff;">more than an entire year</strong> of Atlas AI subscriptions.
+        </p>
+        <div style="margin-top:14px;padding:12px 16px;background:rgba(0,0,0,.3);border-radius:8px;font-size:.82rem;color:#86efac;font-style:italic;">
+          "One prevented P1 incident pays for 12 months of Atlas AI."
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════
+     SLIDE 12 · CALL TO ACTION
+════════════════════════════════════════════════════════════ -->
+<section class="slide" id="s12">
+  <div class="slide-number"><span>12</span> / 12</div>
+
+  <!-- Star field dots -->
+  <div style="position:absolute;top:0;left:0;right:0;bottom:0;overflow:hidden;pointer-events:none;">
+    <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="10%" cy="15%" r="1.5" fill="#3b82f6" opacity=".3"/>
+      <circle cx="25%" cy="8%"  r="1"   fill="#8b5cf6" opacity=".4"/>
+      <circle cx="70%" cy="12%" r="1.5" fill="#3b82f6" opacity=".2"/>
+      <circle cx="88%" cy="20%" r="1"   fill="#8b5cf6" opacity=".3"/>
+      <circle cx="5%"  cy="70%" r="1"   fill="#3b82f6" opacity=".2"/>
+      <circle cx="92%" cy="65%" r="1.5" fill="#8b5cf6" opacity=".25"/>
+      <circle cx="50%" cy="92%" r="1"   fill="#3b82f6" opacity=".3"/>
+      <circle cx="15%" cy="85%" r="1.5" fill="#8b5cf6" opacity=".2"/>
+      <circle cx="80%" cy="88%" r="1"   fill="#3b82f6" opacity=".25"/>
+    </svg>
+  </div>
+
+  <h1>Atlas <span class="gradient-text">AI</span></h1>
+  <p style="font-size:clamp(1rem,2vw,1.4rem);color:#94a3b8;margin:10px 0 0;font-weight:300;">The engineering team that never sleeps.</p>
+
+  <div class="big-quote">"We don't just assist engineers. We <em>are</em> engineers."</div>
+
+  <div class="benefit-row">
+    <div class="benefit">
+      <div class="benefit-dot"></div>
+      Resolves incidents 40× faster
+    </div>
+    <div class="benefit">
+      <div class="benefit-dot"></div>
+      Learns from every resolution
+    </div>
+    <div class="benefit">
+      <div class="benefit-dot"></div>
+      Integrates with your entire stack
+    </div>
+  </div>
+
+  <!-- CTA button-style banner -->
+  <div style="display:inline-flex;align-items:center;gap:16px;background:linear-gradient(135deg,rgba(59,130,246,.15),rgba(139,92,246,.15));border:1px solid rgba(59,130,246,.3);border-radius:14px;padding:20px 36px;margin-bottom:40px;">
+    <div style="width:10px;height:10px;border-radius:50%;background:var(--green);box-shadow:0 0 0 3px rgba(34,197,94,.2);animation:pulse 2s infinite;"></div>
+    <span style="font-size:clamp(1rem,1.8vw,1.3rem);font-weight:600;color:#e2e8f0;">Live demo available — ask us to show the real thing</span>
+  </div>
+
+  <div class="footer-line">
+    Built at OpenAI Hackathon 2025 &nbsp;·&nbsp;
+    <a href="https://github.com/atlas-ai" target="_blank">github.com/atlas-ai</a>
+  </div>
+  <div class="footer-line mt-8" style="margin-top:8px;">
+    Atlas AI &nbsp;·&nbsp; The Autonomous Enterprise Engineer
+  </div>
+</section>
+
+</body>
+</html>

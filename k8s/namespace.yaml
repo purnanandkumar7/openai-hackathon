@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: atlas-ai
+  labels:
+    name: atlas-ai
+    app.kubernetes.io/name: atlas-ai
+    app.kubernetes.io/part-of: atlas-ai-platform
+    environment: production
+    team: platform-engineering
+    managed-by: kubectl
+  annotations:
+    description: "Atlas AI - Autonomous Infrastructure Intelligence Platform"
+    contact: "platform-engineering@company.com"
+    documentation: "https://github.com/company/atlas-ai"
