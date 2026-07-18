@@ -3,16 +3,19 @@ Atlas AI – FastAPI application entry-point.
 
 Bootstraps:
   • OpenTelemetry tracing
-  • Database connection pool
-  • Redis connection
+  • Database connection pool (skipped in MOCK_MODE)
   • All API routers
   • CORS middleware
   • Prometheus metrics middleware
   • Health-check endpoint
+
+Set MOCK_MODE=true to run with zero external dependencies (no Postgres / Redis).
+All endpoints are served from in-memory mock data — perfect for local demos.
 """
 
 from __future__ import annotations
 
+import os
 import time
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
@@ -23,9 +26,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import ORJSONResponse
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
 
-from app.api import agents, incidents, metrics, rca, websocket
 from app.config import get_settings
-from app.db.database import close_db, init_db
+
+_MOCK_MODE = os.getenv("MOCK_MODE", "false").lower() in ("true", "1", "yes")
+
+if not _MOCK_MODE:
+    from app.api import agents, incidents, metrics, rca, websocket
+    from app.db.database import close_db, init_db
 
 logger = structlog.get_logger(__name__)
 settings = get_settings()
@@ -88,16 +95,20 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         "Atlas AI starting",
         environment=settings.ENVIRONMENT,
         version=settings.APP_VERSION,
+        mock_mode=_MOCK_MODE,
     )
 
-    # Database
-    await init_db()
-    logger.info("Database connection pool initialised")
+    if not _MOCK_MODE:
+        await init_db()
+        logger.info("Database connection pool initialised")
+    else:
+        logger.info("MOCK_MODE enabled — skipping database and Redis init")
 
     yield  # ── application runs here ──────────────────────────────────────
 
     logger.info("Atlas AI shutting down – releasing resources")
-    await close_db()
+    if not _MOCK_MODE:
+        await close_db()
 
 
 # ---------------------------------------------------------------------------
@@ -140,27 +151,31 @@ def create_app() -> FastAPI:
         return response
 
     # ── Routers ─────────────────────────────────────────────────────────────
-    app.include_router(incidents.router, prefix="/api/v1/incidents", tags=["incidents"])
-    app.include_router(agents.router, prefix="/api/v1/agents", tags=["agents"])
-    app.include_router(rca.router, prefix="/api/v1/rca", tags=["rca"])
-    app.include_router(metrics.router, prefix="/api/v1/metrics", tags=["metrics"])
-    app.include_router(websocket.router, prefix="/ws", tags=["websocket"])
+    if _MOCK_MODE:
+        from app.api.mock_routes import router as mock_router
+        app.include_router(mock_router)
+    else:
+        app.include_router(incidents.router, prefix="/api/v1/incidents", tags=["incidents"])
+        app.include_router(agents.router, prefix="/api/v1/agents", tags=["agents"])
+        app.include_router(rca.router, prefix="/api/v1/rca", tags=["rca"])
+        app.include_router(metrics.router, prefix="/api/v1/metrics", tags=["metrics"])
+        app.include_router(websocket.router, prefix="/ws", tags=["websocket"])
 
-    # ── Health endpoints ─────────────────────────────────────────────────────
-    @app.get("/health", tags=["ops"], include_in_schema=False)
-    async def health() -> dict[str, str]:
-        return {"status": "ok", "version": settings.APP_VERSION}
+        # ── Health endpoints (non-mock) ──────────────────────────────────────
+        @app.get("/health", tags=["ops"], include_in_schema=False)
+        async def health() -> dict[str, str]:
+            return {"status": "ok", "version": settings.APP_VERSION}
 
-    @app.get("/health/ready", tags=["ops"], include_in_schema=False)
-    async def readiness() -> dict[str, object]:
-        """Deep readiness check – verifies DB + Redis reachability."""
-        from app.db.database import check_db_health
+        @app.get("/health/ready", tags=["ops"], include_in_schema=False)
+        async def readiness() -> dict[str, object]:
+            """Deep readiness check – verifies DB + Redis reachability."""
+            from app.db.database import check_db_health
 
-        db_ok = await check_db_health()
-        return {
-            "status": "ready" if db_ok else "degraded",
-            "checks": {"database": db_ok},
-        }
+            db_ok = await check_db_health()
+            return {
+                "status": "ready" if db_ok else "degraded",
+                "checks": {"database": db_ok},
+            }
 
     @app.get("/metrics/prometheus", tags=["ops"], include_in_schema=False)
     async def prometheus_metrics() -> Response:
